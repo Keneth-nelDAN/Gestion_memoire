@@ -61,6 +61,13 @@ $initiales = strtoupper($nom[0] . ($prenom[0] ?? ''));
                 <p>Centres</p>
             </div>
         </div>
+
+        <!-- FILTRES -->
+        <div class="filtres">
+            <a href="?niveau=Tous" class="filtre-btn <?= ($niveau == 'Tous') ? 'active' : '' ?>">Tous</a>
+            <a href="?niveau=L3" class="filtre-btn <?= ($niveau == 'L3') ? 'active' : '' ?>">Licence 3</a>
+            <a href="?niveau=M2" class="filtre-btn <?= ($niveau == 'M2') ? 'active' : '' ?>">Master 2</a>
+        </div>
     </main>
 
 </body>

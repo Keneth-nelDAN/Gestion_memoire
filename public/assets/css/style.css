@@ -3,7 +3,10 @@
     padding: 0;
     box-sizing:border-box;
 }
-
+main{
+    background: #f4f6f8;
+    min-height: 100vh;
+}
 /* Accueil etudiant */
 .navbar {
     background: #09315e;
@@ -116,16 +119,13 @@
 
 /* dashboard */
 .dashboard{
-    margin-top: 30px;
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 20px;
+    padding:50px 20px 30px 30px;
 }
 
 /* card */
-.dashboard{
-    margin:50px 20px 30px 30px
-}
 .dashboard-card{
     background: white;
     padding: 25px;
@@ -146,4 +146,42 @@
     margin-top: 10px;
     color: gray;
     font-size: 15px;
+}
+
+/* filtres */
+.filtres{
+    margin-top: 30px;
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    border: 1px solid #fff;
+    padding: 10px;
+    width: 250px;
+    background: white;
+    border-radius: 10px;
+    font-size:14px;
+    margin-left: 30px;
+}
+
+/* bouton */
+.filtre-btn{
+    background: white;
+    padding: 5px 10px;
+    border-radius: 10px;
+    text-decoration: none;
+    color: #09315e;
+    /* font-weight: bold;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08); */
+}
+
+/* hover */
+.filtre-btn:hover{
+    background: #09315e;
+    color: white;
+}
+
+/* bouton actif */
+.active{
+    background: #09315e;
+    color: white !important;
 }
