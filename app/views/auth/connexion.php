@@ -266,21 +266,67 @@
             letter-spacing: 0.5px;
         }
 
-        .form-group input {
+        .form-group input,
+        .form-group select {
             width: 100%;
-            padding: 12px 15px;
+            padding: 14px 16px;
             border: 1px solid #e0e0e0;
-            border-radius: 8px;
+            border-radius: 12px;
             font-size: 14px;
             transition: all 0.3s ease;
             background-color: white;
         }
 
-        .form-group input:focus {
+        .form-group input:focus,
+        .form-group select:focus {
             outline: none;
             border-color: #1a3a52;
-            box-shadow: 0 0 0 3px rgba(26, 58, 82, 0.1);
+            box-shadow: 0 0 0 3px rgba(26, 58, 82, 0.08);
             background-color: white;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 20px;
+        }
+
+        .form-grid.two-columns .form-group {
+            margin-bottom: 18px;
+        }
+
+        .form-title {
+            font-size: 32px;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .subtext {
+            color: #6b7280;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+
+        .styled-button {
+            width: 100%;
+            padding: 16px;
+            background-color: #1f3568;
+            color: white;
+            border: none;
+            border-radius: 14px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .styled-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 14px 30px rgba(31, 53, 104, 0.22);
         }
 
         .form-options {
@@ -488,10 +534,12 @@
             <!-- Messages d'alerte -->
             <div id="alertMessage" style="display: none; margin-bottom: 20px; padding: 12px 15px; border-radius: 8px; font-size: 14px;" role="alert"></div>
 
-            <input type="hidden" id="userTypeInput" name="userType" value="">
+            <input type="hidden" id="userTypeInput" name="userType" value="etudiant">
 
             <!-- Formulaire de connexion -->
             <div id="loginPanel">
+                <div class="form-title">Bienvenue</div>
+                <p class="subtext">Connectez-vous à votre espace personnel.</p>
                 <form id="loginForm">
                 <div class="form-group">
                     <label for="email">Adresse Email</label>
@@ -511,7 +559,7 @@
                     <a href="#" class="forgot-password">Mot de passe oublié ?</a>
                 </div>
 
-                <button type="submit" class="login-btn" id="submitBtn">
+                <button type="submit" class="styled-button" id="submitBtn">
                     <i class="fas fa-sign-in-alt"></i>
                     Se connecter
                 </button>
@@ -524,41 +572,65 @@
 
             <!-- Formulaire d'inscription -->
             <div id="registerPanel" class="hidden">
+                <div class="form-title">Créer un compte</div>
+                <p class="subtext">Renseignez vos informations pour créer votre espace d'accès.</p>
                 <form id="registerForm">
-                    <div class="form-group">
-                        <label for="registerNom">Nom</label>
-                        <input type="text" id="registerNom" name="nom" placeholder="Nom" required>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="registerNom">Nom</label>
+                            <input type="text" id="registerNom" name="nom" placeholder="Nom" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="registerPrenom">Prénom</label>
+                            <input type="text" id="registerPrenom" name="prenom" placeholder="Prénom" required>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="registerPrenom">Prénom</label>
-                        <input type="text" id="registerPrenom" name="prenom" placeholder="Prénom" required>
-                    </div>
+
                     <div class="form-group">
                         <label for="registerEmail">Adresse Email</label>
                         <input type="email" id="registerEmail" name="email" placeholder="votre@email.com" required>
                     </div>
-                    <div class="form-group">
-                        <label for="registerPassword">Mot de Passe</label>
-                        <input type="password" id="registerPassword" name="password" placeholder="••••••••" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="registerConfirmPassword">Confirmer le mot de passe</label>
-                        <input type="password" id="registerConfirmPassword" name="confirmPassword" placeholder="••••••••" required>
-                    </div>
-                    <div id="studentExtraFields" class="hidden">
+
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="registerFiliere">Filière</label>
+                            <select id="registerFiliere" name="idfiliere" required>
+                                <option value="">Choisir une filière</option>
+                                <option value="1">Génie Logiciel</option>
+                                <option value="2">Réseaux et Télécoms</option>
+                                <option value="3">Systèmes embarqués</option>
+                                <option value="4">Intelligence Artificielle</option>
+                            </select>
+                        </div>
                         <div class="form-group">
                             <label for="registerNiveau">Niveau</label>
-                            <input type="text" id="registerNiveau" name="niveau" placeholder="Ex: L3" autocomplete="off">
-                        </div>
-                        <div class="form-group">
-                            <label for="registerFiliere">ID de la filière</label>
-                            <input type="number" id="registerFiliere" name="idfiliere" placeholder="ID filière" min="1" autocomplete="off">
+                            <select id="registerNiveau" name="niveau" required>
+                                <option value="">Choisir un niveau</option>
+                                <option value="Licence 1">Licence 1</option>
+                                <option value="Licence 2">Licence 2</option>
+                                <option value="Licence 3">Licence 3</option>
+                                <option value="Master 1">Master 1</option>
+                                <option value="Master 2">Master 2</option>
+                            </select>
                         </div>
                     </div>
-                    <button type="submit" class="login-btn" id="registerBtn">
+
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="registerPassword">Mot de passe</label>
+                            <input type="password" id="registerPassword" name="password" placeholder="••••••••" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="registerConfirmPassword">Confirmer le mot de passe</label>
+                            <input type="password" id="registerConfirmPassword" name="confirmPassword" placeholder="••••••••" required>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="styled-button" id="registerBtn">
                         <i class="fas fa-user-plus"></i>
-                        Créer un compte
+                        Créer mon compte
                     </button>
+
                     <div class="signup-link">
                         Déjà inscrit ? <a href="#" id="showLoginTab">Se connecter</a>
                     </div>
@@ -576,18 +648,11 @@
         const loginPanel = document.getElementById('loginPanel');
         const registerPanel = document.getElementById('registerPanel');
         const tabButtons = document.querySelectorAll('.tab-btn');
-        const studentExtraFields = document.getElementById('studentExtraFields');
 
         function selectUserType(btn, type) {
             document.querySelectorAll('.user-type-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             userTypeInput.value = type;
-
-            if (type === 'etudiant') {
-                studentExtraFields.classList.remove('hidden');
-            } else {
-                studentExtraFields.classList.add('hidden');
-            }
         }
 
         function activateTab(tab) {
@@ -597,11 +662,13 @@
                 registerPanel.classList.add('hidden');
                 alertDiv.style.display = 'none';
                 document.querySelector('.welcome-subtitle').textContent = 'Connectez-vous à votre espace personnel.';
+                userTypeInput.value = '';
             } else {
                 loginPanel.classList.add('hidden');
                 registerPanel.classList.remove('hidden');
                 alertDiv.style.display = 'none';
                 document.querySelector('.welcome-subtitle').textContent = 'Créez un compte pour accéder à la plateforme.';
+                userTypeInput.value = 'etudiant';
             }
         }
 
