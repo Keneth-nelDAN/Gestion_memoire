@@ -46,6 +46,7 @@ try {
         .auth-card {
             width: 100%;
             max-width: 1000px;
+            min-height: 760px;
             background: white;
             border-radius: 18px;
             box-shadow: 0 20px 50px rgba(26,58,82,0.12);
@@ -70,7 +71,7 @@ try {
             padding: 40px 30px;
             display: flex;
             flex-direction: column;
-            justify-content: space-between;
+            justify-content: flex-start;
             align-items: center;
         }
 
@@ -173,7 +174,7 @@ try {
             display: flex;
             justify-content: center;
             gap: 8px;
-            margin-top: 30px;
+            margin-top: auto;
         }
 
         .dot {
@@ -195,7 +196,7 @@ try {
             padding: 40px 50px;
             display: flex;
             flex-direction: column;
-            justify-content: center;
+            justify-content: space-between;
             background-color: #fbfbfd;
         }
 
@@ -219,6 +220,12 @@ try {
             border-bottom: 3px solid transparent;
             position: relative;
             bottom: -20px;
+            text-decoration: none;
+        }
+
+        .tab-btn:hover,
+        .tab-btn:focus {
+            text-decoration: none;
         }
 
         .tab-btn.active {
@@ -422,6 +429,8 @@ try {
         @media (max-width: 992px) {
             .auth-card {
                 max-width: 760px;
+                height: auto;
+                min-height: 720px;
             }
 
             .login-container {
@@ -526,7 +535,7 @@ try {
         <div class="login-right">
             <div class="tab-buttons">
                 <button class="tab-btn active">Se connecter</button>
-                <button class="tab-btn">Créer un compte</button>
+                <a class="tab-btn" href="/Gestion_memoire/app/views/auth/inscription.php">Créer un compte</a>
             </div>
 
             <h2 class="welcome-title">Bienvenue</h2>
@@ -580,81 +589,11 @@ try {
                 </button>
 
                 <div class="signup-link">
-                    Pas encore inscrit ? <a href="#" id="showRegisterTab">Créer un compte</a>
+                    Pas encore inscrit ? <a href="/Gestion_memoire/app/views/auth/inscription.php">Créer un compte</a>
                 </div>
             </form>
             </div>
 
-            <div id="registerPanel" class="hidden">
-                <div class="form-title">Créer un compte</div>
-                <p class="subtext">Renseignez vos informations pour créer votre espace d'accès.</p>
-                <form id="registerForm">
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label for="registerNom">Nom</label>
-                            <input type="text" id="registerNom" name="nom" placeholder="Nom" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="registerPrenom">Prénom</label>
-                            <input type="text" id="registerPrenom" name="prenom" placeholder="Prénom" required>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="registerEmail">Adresse Email</label>
-                        <input type="email" id="registerEmail" name="email" placeholder="votre@email.com" required>
-                    </div>
-
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label for="registerFiliere">Filière</label>
-                            <select id="registerFiliere" name="idfiliere" required>
-                                <option value="">Choisir une filière</option>
-                                <?php foreach ($filieres as $filiere): ?>
-                                    <option value="<?= htmlspecialchars($filiere['idfiliere']) ?>"><?= htmlspecialchars($filiere['nom_filiere']) ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="registerNiveau">Niveau</label>
-                            <select id="registerNiveau" name="niveau" required>
-                                <option value="">Choisir un niveau</option>
-                                <?php if (!empty($niveauOptions)): ?>
-                                    <?php foreach ($niveauOptions as $niveau): ?>
-                                        <option value="<?= htmlspecialchars($niveau) ?>"><?= htmlspecialchars($niveau) ?></option>
-                                    <?php endforeach; ?>
-                                <?php else: ?>
-                                    <option value="Licence 1">Licence 1</option>
-                                    <option value="Licence 2">Licence 2</option>
-                                    <option value="Licence 3">Licence 3</option>
-                                    <option value="Master 1">Master 1</option>
-                                    <option value="Master 2">Master 2</option>
-                                <?php endif; ?>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label for="registerPassword">Mot de passe</label>
-                            <input type="password" id="registerPassword" name="password" placeholder="••••••••" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="registerConfirmPassword">Confirmer le mot de passe</label>
-                            <input type="password" id="registerConfirmPassword" name="confirmPassword" placeholder="••••••••" required>
-                        </div>
-                    </div>
-
-                    <button type="submit" class="styled-button" id="registerBtn">
-                        <i class="fas fa-user-plus"></i>
-                        Créer mon compte
-                    </button>
-
-                    <div class="signup-link">
-                        Déjà inscrit ? <a href="#" id="showLoginTab">Se connecter</a>
-                    </div>
-                </form>
-            </div>
         </div>
         </div>
     </div>
@@ -787,54 +726,6 @@ try {
             });
         });
 
-        document.getElementById('registerForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const userType = userTypeInput.value;
-            const nom = document.getElementById('registerNom').value;
-            const prenom = document.getElementById('registerPrenom').value;
-            const email = document.getElementById('registerEmail').value;
-            const password = document.getElementById('registerPassword').value;
-            const confirmPassword = document.getElementById('registerConfirmPassword').value;
-            const niveau = document.getElementById('registerNiveau').value;
-            const idfiliere = document.getElementById('registerFiliere').value;
-            const registerBtn = document.getElementById('registerBtn');
-
-            if (!userType) {
-                showAlert('warning', '<i class="fas fa-exclamation-triangle"></i> Veuillez sélectionner un rôle avant de vous inscrire.');
-                return;
-            }
-
-            registerBtn.disabled = true;
-            registerBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Inscription en cours...';
-            alertDiv.style.display = 'none';
-
-            fetch('/Gestion_memoire/public/register.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: buildFormBody({ userType, nom, prenom, email, password, confirmPassword, niveau, idfiliere })
-            })
-            .then(response => response.json())
-            .then(data => {
-                registerBtn.disabled = false;
-                registerBtn.innerHTML = '<i class="fas fa-user-plus"></i> Créer un compte';
-                if (data.success) {
-                    showAlert('success', `<i class="fas fa-check-circle"></i> ${data.message}`);
-                    setTimeout(() => activateTab('login'), 1800);
-                } else {
-                    showAlert('danger', `<i class="fas fa-exclamation-circle"></i> ${data.message}`);
-                }
-            })
-            .catch(error => {
-                registerBtn.disabled = false;
-                registerBtn.innerHTML = '<i class="fas fa-user-plus"></i> Créer un compte';
-                showAlert('danger', `<i class="fas fa-exclamation-circle"></i> Erreur de serveur lors de l\'inscription`);
-                console.error('Erreur:', error);
-            });
-        });
-
-        activateTab('login');
     </script>
 </body>
 </html>
