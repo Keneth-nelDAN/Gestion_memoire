@@ -41,6 +41,70 @@ class AuthController {
     }
 
     /**
+     * Crée un nouvel utilisateur selon le rôle
+     * @param string $userType
+     * @param string $nom
+     * @param string $prenom
+     * @param string $email
+     * @param string $password
+     * @param string $confirmPassword
+     * @param string|null $niveau
+     * @param int|null $idfiliere
+     * @return array
+     */
+    public function register($userType, $nom, $prenom, $email, $password, $confirmPassword, $niveau = null, $idfiliere = null) {
+        if (empty($userType) || empty($nom) || empty($prenom) || empty($email) || empty($password) || empty($confirmPassword)) {
+            return [
+                'success' => false,
+                'message' => 'Veuillez remplir tous les champs du formulaire d\'inscription'
+            ];
+        }
+
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return [
+                'success' => false,
+                'message' => 'Le format de l\'email est invalide'
+            ];
+        }
+
+        $allowedRoles = ['etudiant', 'professeur', 'directeur'];
+        if (!in_array($userType, $allowedRoles, true)) {
+            return [
+                'success' => false,
+                'message' => 'Veuillez sélectionner un rôle valide'
+            ];
+        }
+
+        if (strlen($password) < 6) {
+            return [
+                'success' => false,
+                'message' => 'Le mot de passe doit contenir au moins 6 caractères'
+            ];
+        }
+
+        if ($password !== $confirmPassword) {
+            return [
+                'success' => false,
+                'message' => 'Les mots de passe ne correspondent pas'
+            ];
+        }
+
+        switch ($userType) {
+            case 'etudiant':
+                return $this->registerEtudiant($nom, $prenom, $email, $password, $niveau, $idfiliere);
+            case 'professeur':
+                return $this->registerProfesseur($nom, $prenom, $email, $password);
+            case 'directeur':
+                return $this->registerDirecteur($nom, $prenom, $email, $password);
+        }
+
+        return [
+            'success' => false,
+            'message' => 'Impossible de traiter l\'inscription pour ce rôle'
+        ];
+    }
+
+    /**
      * Valide les données saisies
      */
     private function validateInput($userType, $email, $password) {
@@ -187,6 +251,124 @@ class AuthController {
             return [
                 'success' => false,
                 'message' => 'Erreur lors de la connexion : ' . $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Enregistre un étudiant
+     */
+    private function registerEtudiant($nom, $prenom, $email, $password, $niveau = null, $idfiliere = null) {
+        try {
+            if (empty($niveau) || empty($idfiliere)) {
+                return [
+                    'success' => false,
+                    'message' => 'Veuillez renseigner votre niveau et votre filière.'
+                ];
+            }
+
+            // Vérifier si l'email existe déjà
+            $query = 'SELECT email FROM etudiant WHERE email = :email LIMIT 1';
+            $stmt = $this->db->prepare($query);
+            $stmt->execute([':email' => $email]);
+            if ($stmt->fetch(PDO::FETCH_ASSOC)) {
+                return [
+                    'success' => false,
+                    'message' => 'Cet email est déjà utilisé.'
+                ];
+            }
+
+            $query = 'INSERT INTO etudiant (nom, prenom, idfiliere, niveau, email, motdepasse) VALUES (:nom, :prenom, :idfiliere, :niveau, :email, :motdepasse)';
+            $stmt = $this->db->prepare($query);
+            $stmt->execute([
+                ':nom' => $nom,
+                ':prenom' => $prenom,
+                ':idfiliere' => $idfiliere,
+                ':niveau' => $niveau,
+                ':email' => $email,
+                ':motdepasse' => $password
+            ]);
+
+            return [
+                'success' => true,
+                'message' => 'Inscription réussie. Vous pouvez maintenant vous connecter.'
+            ];
+        } catch (Exception $e) {
+            return [
+                'success' => false,
+                'message' => 'Erreur lors de l\'inscription : ' . $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Enregistre un professeur
+     */
+    private function registerProfesseur($nom, $prenom, $email, $password) {
+        try {
+            $query = 'SELECT email FROM professeur WHERE email = :email LIMIT 1';
+            $stmt = $this->db->prepare($query);
+            $stmt->execute([':email' => $email]);
+            if ($stmt->fetch(PDO::FETCH_ASSOC)) {
+                return [
+                    'success' => false,
+                    'message' => 'Cet email est déjà utilisé.'
+                ];
+            }
+
+            $query = 'INSERT INTO professeur (nom, prenom, email, motdepasse) VALUES (:nom, :prenom, :email, :motdepasse)';
+            $stmt = $this->db->prepare($query);
+            $stmt->execute([
+                ':nom' => $nom,
+                ':prenom' => $prenom,
+                ':email' => $email,
+                ':motdepasse' => $password
+            ]);
+
+            return [
+                'success' => true,
+                'message' => 'Inscription réussie. Vous pouvez maintenant vous connecter.'
+            ];
+        } catch (Exception $e) {
+            return [
+                'success' => false,
+                'message' => 'Erreur lors de l\'inscription : ' . $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Enregistre un directeur des études
+     */
+    private function registerDirecteur($nom, $prenom, $email, $password) {
+        try {
+            $query = 'SELECT email FROM direction_etude WHERE email = :email LIMIT 1';
+            $stmt = $this->db->prepare($query);
+            $stmt->execute([':email' => $email]);
+            if ($stmt->fetch(PDO::FETCH_ASSOC)) {
+                return [
+                    'success' => false,
+                    'message' => 'Cet email est déjà utilisé.'
+                ];
+            }
+
+            $query = 'INSERT INTO direction_etude (nom, prenom, email, motdepasse) VALUES (:nom, :prenom, :email, :motdepasse)';
+            $stmt = $this->db->prepare($query);
+            $stmt->execute([
+                ':nom' => $nom,
+                ':prenom' => $prenom,
+                ':email' => $email,
+                ':motdepasse' => $password
+            ]);
+
+            return [
+                'success' => true,
+                'message' => 'Inscription réussie. Vous pouvez maintenant vous connecter.'
+            ];
+        } catch (Exception $e) {
+            return [
+                'success' => false,
+                'message' => 'Erreur lors de l\'inscription : ' . $e->getMessage()
             ];
         }
     }

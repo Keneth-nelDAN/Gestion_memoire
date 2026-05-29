@@ -336,6 +336,10 @@
             color: #666;
         }
 
+        .hidden {
+            display: none;
+        }
+
         .signup-link a {
             color: #d4af37;
             text-decoration: none;
@@ -484,8 +488,11 @@
             <!-- Messages d'alerte -->
             <div id="alertMessage" style="display: none; margin-bottom: 20px; padding: 12px 15px; border-radius: 8px; font-size: 14px;" role="alert"></div>
 
+            <input type="hidden" id="userTypeInput" name="userType" value="">
+
             <!-- Formulaire de connexion -->
-            <form id="loginForm">
+            <div id="loginPanel">
+                <form id="loginForm">
                 <div class="form-group">
                     <label for="email">Adresse Email</label>
                     <input type="email" id="email" name="email" placeholder="votre@email.com" required>
@@ -510,9 +517,53 @@
                 </button>
 
                 <div class="signup-link">
-                    Pas encore inscrit ? <a href="#">Créer un compte</a>
+                    Pas encore inscrit ? <a href="#" id="showRegisterTab">Créer un compte</a>
                 </div>
             </form>
+            </div>
+
+            <!-- Formulaire d'inscription -->
+            <div id="registerPanel" class="hidden">
+                <form id="registerForm">
+                    <div class="form-group">
+                        <label for="registerNom">Nom</label>
+                        <input type="text" id="registerNom" name="nom" placeholder="Nom" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="registerPrenom">Prénom</label>
+                        <input type="text" id="registerPrenom" name="prenom" placeholder="Prénom" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="registerEmail">Adresse Email</label>
+                        <input type="email" id="registerEmail" name="email" placeholder="votre@email.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="registerPassword">Mot de Passe</label>
+                        <input type="password" id="registerPassword" name="password" placeholder="••••••••" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="registerConfirmPassword">Confirmer le mot de passe</label>
+                        <input type="password" id="registerConfirmPassword" name="confirmPassword" placeholder="••••••••" required>
+                    </div>
+                    <div id="studentExtraFields" class="hidden">
+                        <div class="form-group">
+                            <label for="registerNiveau">Niveau</label>
+                            <input type="text" id="registerNiveau" name="niveau" placeholder="Ex: L3" autocomplete="off">
+                        </div>
+                        <div class="form-group">
+                            <label for="registerFiliere">ID de la filière</label>
+                            <input type="number" id="registerFiliere" name="idfiliere" placeholder="ID filière" min="1" autocomplete="off">
+                        </div>
+                    </div>
+                    <button type="submit" class="login-btn" id="registerBtn">
+                        <i class="fas fa-user-plus"></i>
+                        Créer un compte
+                    </button>
+                    <div class="signup-link">
+                        Déjà inscrit ? <a href="#" id="showLoginTab">Se connecter</a>
+                    </div>
+                </form>
+            </div>
         </div>
         </div>
     </div>
@@ -520,69 +571,109 @@
     <!--Activation des composantes Boostrap interactifs
      <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script> -->
     <script>
+        const userTypeInput = document.getElementById('userTypeInput');
+        const alertDiv = document.getElementById('alertMessage');
+        const loginPanel = document.getElementById('loginPanel');
+        const registerPanel = document.getElementById('registerPanel');
+        const tabButtons = document.querySelectorAll('.tab-btn');
+        const studentExtraFields = document.getElementById('studentExtraFields');
+
         function selectUserType(btn, type) {
-            // Retirer la classe active de tous les boutons
-            document.querySelectorAll('.user-type-btn').forEach(b => {
-                b.classList.remove('active');
-            });
-            // Ajouter la classe active au bouton cliqué
+            document.querySelectorAll('.user-type-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
-            // Stocker le type d'utilisateur pour l'envoyer avec le formulaire
-            document.getElementById('loginForm').dataset.userType = type;
+            userTypeInput.value = type;
+
+            if (type === 'etudiant') {
+                studentExtraFields.classList.remove('hidden');
+            } else {
+                studentExtraFields.classList.add('hidden');
+            }
         }
 
-        // Gestion de la soumission du formulaire
-        document.getElementById('loginForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            // Récupérer les valeurs du formulaire
-            const userType = document.getElementById('loginForm').dataset.userType;
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-            const submitBtn = document.getElementById('submitBtn');
-            const alertDiv = document.getElementById('alertMessage');
+        function activateTab(tab) {
+            tabButtons.forEach(button => button.classList.toggle('active', button.textContent.trim() === (tab === 'login' ? 'Se connecter' : 'Créer un compte')));
+            if (tab === 'login') {
+                loginPanel.classList.remove('hidden');
+                registerPanel.classList.add('hidden');
+                alertDiv.style.display = 'none';
+                document.querySelector('.welcome-subtitle').textContent = 'Connectez-vous à votre espace personnel.';
+            } else {
+                loginPanel.classList.add('hidden');
+                registerPanel.classList.remove('hidden');
+                alertDiv.style.display = 'none';
+                document.querySelector('.welcome-subtitle').textContent = 'Créez un compte pour accéder à la plateforme.';
+            }
+        }
 
-            if (!userType) {
-                alertDiv.className = 'alert alert-warning';
+        document.querySelectorAll('.tab-btn').forEach(button => {
+            button.addEventListener('click', () => {
+                const tab = button.textContent.trim() === 'Créer un compte' ? 'register' : 'login';
+                activateTab(tab);
+            });
+        });
+
+        document.getElementById('showRegisterTab').addEventListener('click', function(e) {
+            e.preventDefault();
+            activateTab('register');
+        });
+
+        document.getElementById('showLoginTab').addEventListener('click', function(e) {
+            e.preventDefault();
+            activateTab('login');
+        });
+
+        function showAlert(type, message) {
+            alertDiv.className = '';
+            if (type === 'success') {
+                alertDiv.style.backgroundColor = '#d4edda';
+                alertDiv.style.color = '#155724';
+                alertDiv.style.borderLeft = '4px solid #28a745';
+            } else if (type === 'warning') {
                 alertDiv.style.backgroundColor = '#fff3cd';
                 alertDiv.style.color = '#856404';
                 alertDiv.style.borderLeft = '4px solid #ffeeba';
-                alertDiv.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Veuillez sélectionner votre rôle avant de vous connecter.';
-                alertDiv.style.display = 'block';
+            } else {
+                alertDiv.style.backgroundColor = '#f8d7da';
+                alertDiv.style.color = '#721c24';
+                alertDiv.style.borderLeft = '4px solid #f5c6cb';
+            }
+            alertDiv.innerHTML = message;
+            alertDiv.style.display = 'block';
+        }
+
+        function buildFormBody(values) {
+            return Object.keys(values).map(key => `${encodeURIComponent(key)}=${encodeURIComponent(values[key])}`).join('&');
+        }
+
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const userType = userTypeInput.value;
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const submitBtn = document.getElementById('submitBtn');
+
+            if (!userType) {
+                showAlert('warning', '<i class="fas fa-exclamation-triangle"></i> Veuillez sélectionner votre rôle avant de vous connecter.');
                 return;
             }
-            
-            // Désactiver le bouton pendant l'envoi
+
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Connexion en cours...';
-            
-            // Masquer le message d'alerte précédent
             alertDiv.style.display = 'none';
-            
-            // Envoyer les données au serveur via AJAX
+
             fetch('/Gestion_memoire/public/login.php', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
                 },
-                body: `userType=${encodeURIComponent(userType)}&email=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}`
+                body: buildFormBody({ userType, email, password })
             })
             .then(response => response.json())
             .then(data => {
-                // Réactiver le bouton
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Se connecter';
-                
                 if (data.success) {
-                    // Afficher un message de succès
-                    alertDiv.className = 'alert alert-success';
-                    alertDiv.style.backgroundColor = '#d4edda';
-                    alertDiv.style.color = '#155724';
-                    alertDiv.style.borderLeft = '4px solid #28a745';
-                    alertDiv.innerHTML = `<i class="fas fa-check-circle"></i> ${data.message}`;
-                    alertDiv.style.display = 'block';
-                    
-                    // Redirection après 2 secondes selon le type d'utilisateur
+                    showAlert('success', `<i class="fas fa-check-circle"></i> ${data.message}`);
                     setTimeout(() => {
                         switch(data.user.type) {
                             case 'etudiant':
@@ -595,32 +686,67 @@
                                 window.location.href = '/Gestion_memoire/app/views/direction_etude/dashboard_de.php';
                                 break;
                         }
-                    }, 2000);
+                    }, 1500);
                 } else {
-                    // Afficher un message d'erreur
-                    alertDiv.className = 'alert alert-danger';
-                    alertDiv.style.backgroundColor = '#f8d7da';
-                    alertDiv.style.color = '#721c24';
-                    alertDiv.style.borderLeft = '4px solid #f5c6cb';
-                    alertDiv.innerHTML = `<i class="fas fa-exclamation-circle"></i> ${data.message}`;
-                    alertDiv.style.display = 'block';
+                    showAlert('danger', `<i class="fas fa-exclamation-circle"></i> ${data.message}`);
                 }
             })
             .catch(error => {
-                // Réactiver le bouton en cas d'erreur
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Se connecter';
-                
-                alertDiv.className = 'alert alert-danger';
-                alertDiv.style.backgroundColor = '#f8d7da';
-                alertDiv.style.color = '#721c24';
-                alertDiv.style.borderLeft = '4px solid #f5c6cb';
-                alertDiv.innerHTML = `<i class="fas fa-exclamation-circle"></i> Erreur de connexion au serveur`;
-                alertDiv.style.display = 'block';
-                
+                showAlert('danger', `<i class="fas fa-exclamation-circle"></i> Erreur de connexion au serveur`);
                 console.error('Erreur:', error);
             });
         });
+
+        document.getElementById('registerForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const userType = userTypeInput.value;
+            const nom = document.getElementById('registerNom').value;
+            const prenom = document.getElementById('registerPrenom').value;
+            const email = document.getElementById('registerEmail').value;
+            const password = document.getElementById('registerPassword').value;
+            const confirmPassword = document.getElementById('registerConfirmPassword').value;
+            const niveau = document.getElementById('registerNiveau').value;
+            const idfiliere = document.getElementById('registerFiliere').value;
+            const registerBtn = document.getElementById('registerBtn');
+
+            if (!userType) {
+                showAlert('warning', '<i class="fas fa-exclamation-triangle"></i> Veuillez sélectionner un rôle avant de vous inscrire.');
+                return;
+            }
+
+            registerBtn.disabled = true;
+            registerBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Inscription en cours...';
+            alertDiv.style.display = 'none';
+
+            fetch('/Gestion_memoire/public/register.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: buildFormBody({ userType, nom, prenom, email, password, confirmPassword, niveau, idfiliere })
+            })
+            .then(response => response.json())
+            .then(data => {
+                registerBtn.disabled = false;
+                registerBtn.innerHTML = '<i class="fas fa-user-plus"></i> Créer un compte';
+                if (data.success) {
+                    showAlert('success', `<i class="fas fa-check-circle"></i> ${data.message}`);
+                    setTimeout(() => activateTab('login'), 1800);
+                } else {
+                    showAlert('danger', `<i class="fas fa-exclamation-circle"></i> ${data.message}`);
+                }
+            })
+            .catch(error => {
+                registerBtn.disabled = false;
+                registerBtn.innerHTML = '<i class="fas fa-user-plus"></i> Créer un compte';
+                showAlert('danger', `<i class="fas fa-exclamation-circle"></i> Erreur de serveur lors de l\'inscription`);
+                console.error('Erreur:', error);
+            });
+        });
+
+        activateTab('login');
     </script>
 </body>
 </html>
