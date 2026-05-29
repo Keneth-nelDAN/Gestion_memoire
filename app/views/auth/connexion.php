@@ -1,3 +1,23 @@
+<?php
+require_once __DIR__ . '/../../../config/database.php';
+
+$filieres = [];
+$niveauOptions = [];
+
+try {
+    $database = new Database();
+    $db = $database->connect();
+
+    $stmt = $db->query('SELECT idfiliere, nom_filiere FROM filiere ORDER BY nom_filiere');
+    $filieres = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $stmt = $db->query('SELECT DISTINCT niveau FROM etudiant ORDER BY niveau');
+    $niveauOptions = $stmt->fetchAll(PDO::FETCH_COLUMN);
+} catch (Exception $e) {
+    $filieres = [];
+    $niveauOptions = [];
+}
+?>
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -23,7 +43,6 @@
             padding: 40px;
         }
 
-        /* Carte centrée et flottante */
         .auth-card {
             width: 100%;
             max-width: 1000px;
@@ -44,7 +63,6 @@
             width: 100%;
         }
 
-        /* Section gauche */
         .login-left {
             flex: 1;
             background: linear-gradient(135deg, #1a3a52 0%, #2c5aa0 100%);
@@ -96,6 +114,10 @@
             justify-content: center;
             width: 100%;
             max-width: 400px;
+        }
+
+        .login-left.register-active .brand-content {
+            justify-content: flex-end;
         }
 
         .brand-title {
@@ -168,7 +190,6 @@
             border-radius: 5px;
         }
 
-        /* Section droite */
         .login-right {
             flex: 1;
             padding: 40px 50px;
@@ -398,7 +419,6 @@
             color: #c99c2e;
         }
 
-        /* Responsive */
         @media (max-width: 992px) {
             .auth-card {
                 max-width: 760px;
@@ -459,7 +479,6 @@
 <body>
     <div class="auth-card">
         <div class="login-container">
-        <!-- Section Gauche -->
         <div class="login-left">
             <div class="brand_icon">
                 <div class="brand-icon">M</div>
@@ -504,7 +523,6 @@
             </div>
         </div>
 
-        <!-- Section Droite -->
         <div class="login-right">
             <div class="tab-buttons">
                 <button class="tab-btn active">Se connecter</button>
@@ -514,7 +532,6 @@
             <h2 class="welcome-title">Bienvenue</h2>
             <p class="welcome-subtitle">Connectez-vous à votre espace personnel.</p>
 
-            <!-- Sélection du type d'utilisateur -->
              <p style="font-weight: bold;">Je suis...</p>
             <div class="user-type-buttons">
                 <button class="user-type-btn" onclick="selectUserType(this, 'etudiant')">
@@ -531,12 +548,10 @@
                 </button>
             </div>
 
-            <!-- Messages d'alerte -->
             <div id="alertMessage" style="display: none; margin-bottom: 20px; padding: 12px 15px; border-radius: 8px; font-size: 14px;" role="alert"></div>
 
             <input type="hidden" id="userTypeInput" name="userType" value="etudiant">
 
-            <!-- Formulaire de connexion -->
             <div id="loginPanel">
                 <div class="form-title">Bienvenue</div>
                 <p class="subtext">Connectez-vous à votre espace personnel.</p>
@@ -570,7 +585,6 @@
             </form>
             </div>
 
-            <!-- Formulaire d'inscription -->
             <div id="registerPanel" class="hidden">
                 <div class="form-title">Créer un compte</div>
                 <p class="subtext">Renseignez vos informations pour créer votre espace d'accès.</p>
@@ -596,21 +610,26 @@
                             <label for="registerFiliere">Filière</label>
                             <select id="registerFiliere" name="idfiliere" required>
                                 <option value="">Choisir une filière</option>
-                                <option value="1">Génie Logiciel</option>
-                                <option value="2">Réseaux et Télécoms</option>
-                                <option value="3">Systèmes embarqués</option>
-                                <option value="4">Intelligence Artificielle</option>
+                                <?php foreach ($filieres as $filiere): ?>
+                                    <option value="<?= htmlspecialchars($filiere['idfiliere']) ?>"><?= htmlspecialchars($filiere['nom_filiere']) ?></option>
+                                <?php endforeach; ?>
                             </select>
                         </div>
                         <div class="form-group">
                             <label for="registerNiveau">Niveau</label>
                             <select id="registerNiveau" name="niveau" required>
                                 <option value="">Choisir un niveau</option>
-                                <option value="Licence 1">Licence 1</option>
-                                <option value="Licence 2">Licence 2</option>
-                                <option value="Licence 3">Licence 3</option>
-                                <option value="Master 1">Master 1</option>
-                                <option value="Master 2">Master 2</option>
+                                <?php if (!empty($niveauOptions)): ?>
+                                    <?php foreach ($niveauOptions as $niveau): ?>
+                                        <option value="<?= htmlspecialchars($niveau) ?>"><?= htmlspecialchars($niveau) ?></option>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <option value="Licence 1">Licence 1</option>
+                                    <option value="Licence 2">Licence 2</option>
+                                    <option value="Licence 3">Licence 3</option>
+                                    <option value="Master 1">Master 1</option>
+                                    <option value="Master 2">Master 2</option>
+                                <?php endif; ?>
                             </select>
                         </div>
                     </div>
@@ -640,8 +659,7 @@
         </div>
     </div>
 
-    <!--Activation des composantes Boostrap interactifs
-     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script> -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         const userTypeInput = document.getElementById('userTypeInput');
         const alertDiv = document.getElementById('alertMessage');
@@ -657,18 +675,21 @@
 
         function activateTab(tab) {
             tabButtons.forEach(button => button.classList.toggle('active', button.textContent.trim() === (tab === 'login' ? 'Se connecter' : 'Créer un compte')));
+            const loginLeft = document.querySelector('.login-left');
             if (tab === 'login') {
                 loginPanel.classList.remove('hidden');
                 registerPanel.classList.add('hidden');
                 alertDiv.style.display = 'none';
                 document.querySelector('.welcome-subtitle').textContent = 'Connectez-vous à votre espace personnel.';
                 userTypeInput.value = '';
+                loginLeft.classList.remove('register-active');
             } else {
                 loginPanel.classList.add('hidden');
                 registerPanel.classList.remove('hidden');
                 alertDiv.style.display = 'none';
                 document.querySelector('.welcome-subtitle').textContent = 'Créez un compte pour accéder à la plateforme.';
                 userTypeInput.value = 'etudiant';
+                loginLeft.classList.add('register-active');
             }
         }
 

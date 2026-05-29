@@ -10,13 +10,6 @@ class AuthController {
         $this->db = $database->connect();
     }
 
-    /**
-     * Valide les identifiants de l'utilisateur
-     * @param string $userType Type d'utilisateur (etudiant, professeur, directeur)
-     * @param string $email Email de l'utilisateur
-     * @param string $password Mot de passe de l'utilisateur
-     * @return array Résultat de la validation avec statut et données utilisateur
-     */
     public function login($userType, $email, $password) {
         // Validation des champs
         $validation = $this->validateInput($userType, $email, $password);
@@ -40,18 +33,6 @@ class AuthController {
         }
     }
 
-    /**
-     * Crée un nouvel utilisateur selon le rôle
-     * @param string $userType
-     * @param string $nom
-     * @param string $prenom
-     * @param string $email
-     * @param string $password
-     * @param string $confirmPassword
-     * @param string|null $niveau
-     * @param int|null $idfiliere
-     * @return array
-     */
     public function register($userType, $nom, $prenom, $email, $password, $confirmPassword, $niveau = null, $idfiliere = null) {
         if (empty($userType) || empty($nom) || empty($prenom) || empty($email) || empty($password) || empty($confirmPassword)) {
             return [
@@ -104,9 +85,6 @@ class AuthController {
         ];
     }
 
-    /**
-     * Valide les données saisies
-     */
     private function validateInput($userType, $email, $password) {
         // Vérifier que tous les champs sont remplis
         if (empty($userType) || empty($email) || empty($password)) {
@@ -144,9 +122,6 @@ class AuthController {
         return ['success' => true];
     }
 
-    /**
-     * Connexion pour un étudiant
-     */
     private function loginEtudiant($email, $password) {
         try {
             $query = 'SELECT * FROM etudiant WHERE email = :email LIMIT 1';
@@ -181,9 +156,6 @@ class AuthController {
         }
     }
 
-    /**
-     * Connexion pour un professeur
-     */
     private function loginProfesseur($email, $password) {
         try {
             $query = 'SELECT * FROM professeur WHERE email = :email LIMIT 1';
@@ -218,9 +190,6 @@ class AuthController {
         }
     }
 
-    /**
-     * Connexion pour un directeur des études
-     */
     private function loginDirecteur($email, $password) {
         try {
             $query = 'SELECT * FROM direction_etude WHERE email = :email LIMIT 1';
@@ -255,9 +224,6 @@ class AuthController {
         }
     }
 
-    /**
-     * Enregistre un étudiant
-     */
     private function registerEtudiant($nom, $prenom, $email, $password, $niveau = null, $idfiliere = null) {
         try {
             if (empty($niveau) || empty($idfiliere)) {
@@ -301,9 +267,6 @@ class AuthController {
         }
     }
 
-    /**
-     * Enregistre un professeur
-     */
     private function registerProfesseur($nom, $prenom, $email, $password) {
         try {
             $query = 'SELECT email FROM professeur WHERE email = :email LIMIT 1';
@@ -337,9 +300,6 @@ class AuthController {
         }
     }
 
-    /**
-     * Enregistre un directeur des études
-     */
     private function registerDirecteur($nom, $prenom, $email, $password) {
         try {
             $query = 'SELECT email FROM direction_etude WHERE email = :email LIMIT 1';
