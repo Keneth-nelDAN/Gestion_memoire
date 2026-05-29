@@ -1,9 +1,12 @@
 <?php
-session_start();
 
-$nom = $_SESSION['nom'] ?? "User";
-$prenom = $_SESSION['prenom'] ?? "File";
-$initiales = strtoupper($nom[0] . ($prenom[0] ?? ''));
+
+    $nom = $_SESSION['nom'] ?? "User";
+    $prenom = $_SESSION['prenom'] ?? "File";
+    $initiales = strtoupper($nom[0] . ($prenom[0] ?? ''));
+
+    
+
 ?>
 
 <!DOCTYPE html>
@@ -67,6 +70,80 @@ $initiales = strtoupper($nom[0] . ($prenom[0] ?? ''));
             <a href="?niveau=Tous" class="filtre-btn <?= ($niveau == 'Tous') ? 'active' : '' ?>">Tous</a>
             <a href="?niveau=L3" class="filtre-btn <?= ($niveau == 'L3') ? 'active' : '' ?>">Licence 3</a>
             <a href="?niveau=M2" class="filtre-btn <?= ($niveau == 'M2') ? 'active' : '' ?>">Master 2</a>
+        </div>
+
+        <!-- PUBLICATIONS -->
+         <h2 class="section-title">
+            Mémoires récents
+        </h2>
+        <div class="publications">
+            <?php foreach($publications as $pub): ?>
+                <div class="publication-card">
+
+                    <!-- HEADER -->
+                    <div class="publication-header">
+                        <span class="badge-filiere">
+                            <?= $pub['niveau'] ?>
+                        </span>
+                        <span class="annee">
+                            <?= $pub['annee_academique'] ?>
+                        </span>
+                    </div>
+
+                    <!-- BODY -->
+                    <div class="publication-body">
+                        <h3>
+                            <?= $pub['theme'] ?>
+                        </h3>
+                        <p class="auteur">
+                            Par
+                            <?= $pub['nomAut'] ?>
+                            <?= $pub['prenomAut'] ?>
+                        </p>
+                        <p class="info">
+                            <i class="fa-solid fa-book"></i>
+                            <?= $pub['idfiliere'] ?>
+                        </p>
+                        <p class="info">
+                            <i class="fa-solid fa-location-dot"></i>
+                            <?= $pub['centre'] ?>
+                        </p>
+                        <p class="info">
+                            <i class="fa-solid fa-user-graduate"></i>
+                            Dir. :
+                            <?= $pub['maitre_memoire'] ?>
+                        </p>
+                    </div>
+
+                    <!-- FOOTER -->
+                    <div class="publication-footer">
+                        <div class="stats">
+                            <span class="likes">
+                                <?php
+                                    $totalLikes = $likeModel->countLikes($pub['idAM']);
+                                    $isLiked = $likeModel->isLiked(
+                                        $pub['idAM'],
+                                        $_SESSION['idetudiant']
+                                    );
+                                ?>
+                                <a href="/Gestion_memoire/public/like.php?id=<?= $pub['idAM'] ?>" class="likes">
+                                    <i class="fa-solid fa-heart
+                                    <?= $isLiked ? 'liked' : '' ?>"></i>
+                                    <?= $totalLikes ?>
+                                </a>
+                            </span>
+                            <span class="comments">
+                                <i class="fa-solid fa-message"></i>
+                                11
+                            </span>
+                        </div>
+                        <a href="#" class="btn-voir">
+                            Voir
+                            <i class="fa-solid fa-arrow-right"></i>
+                        </a>
+                    </div>
+                </div>
+            <?php endforeach; ?>
         </div>
     </main>
 

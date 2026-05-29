@@ -2,6 +2,8 @@
 require_once "../config/database.php";
 require_once "../app/models/dashboard.php";
 require_once "../app/models/Memoire.php";
+require_once "../app/models/Publication.php";
+require_once "../app/models/like.php";
 
 class dashboardController {
     public function index()
@@ -24,8 +26,13 @@ class dashboardController {
 
         // mémoires filtrés
         $memoires = $memoireModel->getMemoires($niveau);
-        
+
+        // Likes
+        $likeModel = new Like($pdo);
+
         // VIEW
         require_once "../app/views/memoire/index.php";
     }
+
+
 }
