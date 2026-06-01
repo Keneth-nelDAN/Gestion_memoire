@@ -1,5 +1,5 @@
 <?php
-class dashboard {
+class Dashboard {
     private $pdo;
 
     public function __construct($pdo)
@@ -7,20 +7,38 @@ class dashboard {
         $this->pdo = $pdo;
     }
 
-    // Nombre de mémoires publiés
+    // nombre mémoires publiés
     public function countMemoires()
     {
-        $sql = "SELECT COUNT(*) as total FROM memoire";
-        $stmt = $this->pdo->query($sql);
-        return $stmt->fetch(PDO::FETCH_ASSOC)['total'];
+        $sql = "SELECT COUNT(*) as total
+                FROM ancien_memoire
+                WHERE statut = 'publie'";
+
+        return $this->pdo
+                    ->query($sql)
+                    ->fetch(PDO::FETCH_ASSOC)['total'];
     }
 
-    // Nombre de filières
+    // nombre filières
     public function countFilieres()
     {
-        $sql = "SELECT COUNT(*) as total FROM filiere";
-        $stmt = $this->pdo->query($sql);
-        return $stmt->fetch(PDO::FETCH_ASSOC)['total'];
+        $sql = "SELECT COUNT(*) as total
+                FROM filiere";
+
+        return $this->pdo
+                    ->query($sql)
+                    ->fetch(PDO::FETCH_ASSOC)['total'];
+    }
+
+    // nombre centres
+    public function countCentres()
+    {
+        $sql = "SELECT COUNT(*) as total
+                FROM centre";
+
+        return $this->pdo
+                    ->query($sql)
+                    ->fetch(PDO::FETCH_ASSOC)['total'];
     }
 }
 ?>
