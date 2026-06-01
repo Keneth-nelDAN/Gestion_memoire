@@ -620,7 +620,8 @@ try {
                 registerPanel.classList.add('hidden');
                 alertDiv.style.display = 'none';
                 document.querySelector('.welcome-subtitle').textContent = 'Connectez-vous à votre espace personnel.';
-                userTypeInput.value = '';
+                // Par défaut pour l'onglet connexion, conserver le rôle étudiant
+                userTypeInput.value = 'etudiant';
                 loginLeft.classList.remove('register-active');
             } else {
                 loginPanel.classList.add('hidden');
@@ -639,15 +640,22 @@ try {
             });
         });
 
-        document.getElementById('showRegisterTab').addEventListener('click', function(e) {
-            e.preventDefault();
-            activateTab('register');
-        });
+        // Certains éléments (showRegisterTab / showLoginTab) peuvent ne pas exister
+        const showRegisterTabBtn = document.getElementById('showRegisterTab');
+        if (showRegisterTabBtn) {
+            showRegisterTabBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                activateTab('register');
+            });
+        }
 
-        document.getElementById('showLoginTab').addEventListener('click', function(e) {
-            e.preventDefault();
-            activateTab('login');
-        });
+        const showLoginTabBtn = document.getElementById('showLoginTab');
+        if (showLoginTabBtn) {
+            showLoginTabBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                activateTab('login');
+            });
+        }
 
         function showAlert(type, message) {
             alertDiv.className = '';
@@ -693,6 +701,7 @@ try {
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
                 },
+                credentials: 'include',
                 body: buildFormBody({ userType, email, password })
             })
             .then(response => response.json())
