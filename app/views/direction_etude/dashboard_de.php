@@ -16,6 +16,7 @@ $active_page = 'dashboard';
 $de_profile = get_de_profile($conn);
 $nom_de = $de_profile['nom_de'];
 $initiales_de = $de_profile['initiales_de'];
+ensure_etudiant_account_schema($conn);
 
 $search = trim($_GET['q'] ?? '');
 $filiere_filter = (int) ($_GET['filiere'] ?? 0);
@@ -26,6 +27,8 @@ $nb_publies = scalar_count($conn, "SELECT COUNT(*) FROM ancien_memoire WHERE sta
 $nb_attente = scalar_count($conn, "SELECT COUNT(*) FROM ancien_memoire WHERE statut IN ('en_attente','valide_non_publie')");
 $nb_mois = scalar_count($conn, "SELECT COUNT(*) FROM ancien_memoire WHERE MONTH(date_depot) = MONTH(CURRENT_DATE()) AND YEAR(date_depot) = YEAR(CURRENT_DATE())");
 $nb_etudiants = scalar_count($conn, "SELECT COUNT(*) FROM etudiant");
+$nb_consultants = scalar_count($conn, "SELECT COUNT(*) FROM etudiant WHERE type_compte = 'consultant'");
+$nb_diplomes = scalar_count($conn, "SELECT COUNT(*) FROM etudiant WHERE type_compte = 'diplome'");
 
 $filieres = mysqli_query($conn, "SELECT idfiliere, nom_filiere FROM filiere ORDER BY nom_filiere ASC");
 $annees = mysqli_query($conn, "SELECT DISTINCT annee_academique FROM ancien_memoire WHERE annee_academique IS NOT NULL AND annee_academique <> '' ORDER BY annee_academique DESC");
@@ -133,14 +136,14 @@ if ($stmt) {
                 <div class="stat-icon"><i class="fa-solid fa-user-graduate"></i></div>
                 <span class="card-label">Étudiants actifs</span>
                 <strong><?= $nb_etudiants ?></strong>
-                <small>Sur la plateforme</small>
+                <small><?= $nb_consultants ?> consultaires · <?= $nb_diplomes ?> diplômés</small>
             </article>
         </section>
 
         <section class="quick-actions">
             <a href="publier_memoire.php"><i class="fa-solid fa-file-circle-plus"></i><span>Publier un mémoire</span></a>
             <a href="publier_lots.php"><i class="fa-solid fa-cloud-arrow-up"></i><span>Uploader plusieurs fichiers</span></a>
-            <a href="professeurs_de.php"><i class="fa-solid fa-user-plus"></i><span>Ajouter un professeur</span></a>
+            <a href="etudiants_de.php"><i class="fa-solid fa-users"></i><span>Créer un compte étudiant</span></a>
         </section>
 
         <section class="table-container" id="publications">

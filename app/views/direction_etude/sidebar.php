@@ -45,7 +45,9 @@ if (!isset($initiales_de)) {
         <a class="<?= $active_page === 'professeurs' ? 'active' : '' ?>" href="professeurs_de.php">
             <i class="fa-solid fa-user-plus"></i> Ajouter professeur
         </a>
-        <a href="#"><i class="fa-solid fa-users"></i> Étudiants</a>
+        <a class="<?= $active_page === 'etudiants' ? 'active' : '' ?>" href="etudiants_de.php">
+            <i class="fa-solid fa-users"></i> Étudiants
+        </a>
     </nav>
 
     <a class="logout-link" href="../../../public/logout.php">
