@@ -56,7 +56,7 @@ if ($annee_filter !== '') {
 $sql = "SELECT am.*, f.nom_filiere,
         CONCAT(am.prenomAut, ' ', am.nomAut) AS auteur,
         CONCAT_WS('; ', am.maitre_memoire, am.examinateur, am.president_jury) AS jury,
-        (SELECT COUNT(*) FROM like_memoire lm WHERE lm.idAM = am.idAM) AS vues,
+        (SELECT COUNT(*) FROM like_memoire lm WHERE lm.idAM = am.idAM OR lm.idmemoire = am.idAM) AS likes,
         (SELECT COUNT(*) FROM commentaire c WHERE c.idmemoire = am.idAM) AS commentaires
     FROM ancien_memoire am
     LEFT JOIN filiere f ON f.idfiliere = am.idfiliere";
@@ -184,7 +184,7 @@ if ($stmt) {
                             <div class="memoire-meta">
                                 <p><i class="fa-solid fa-user-graduate"></i> <strong>Auteur :</strong> <?= e($memoire['auteur']) ?></p>
                                 <p><i class="fa-solid fa-gavel"></i> <strong>Jury :</strong> <?= e($memoire['jury'] ?: 'Non renseigné') ?></p>
-                                <p><i class="fa-solid fa-eye"></i> <?= (int) $memoire['vues'] ?> vues · <i class="fa-solid fa-comment"></i> <?= (int) $memoire['commentaires'] ?> commentaires</p>
+                                <p><i class="fa-solid fa-heart"></i> <?= (int) $memoire['likes'] ?> likes · <i class="fa-solid fa-comment"></i> <?= (int) $memoire['commentaires'] ?> commentaires</p>
                             </div>
 
                             <div class="memoire-card-actions">

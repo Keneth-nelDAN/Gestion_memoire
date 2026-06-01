@@ -47,4 +47,32 @@ function bind_params_dynamic($stmt, $types, &$params) {
     }
     return mysqli_stmt_bind_param($stmt, $types, ...$refs);
 }
+
+function get_de_centres($conn) {
+    $centres = ['Agla', 'Akpakpa', 'Gbegamey', 'Calavi', 'Porto-novo'];
+
+    foreach ($centres as $centre) {
+        $check = mysqli_prepare($conn, 'SELECT idCentre FROM centre WHERE nomCentre = ? LIMIT 1');
+        if (!$check) {
+            continue;
+        }
+        mysqli_stmt_bind_param($check, 's', $centre);
+        mysqli_stmt_execute($check);
+        $result = mysqli_stmt_get_result($check);
+        if (!$result || mysqli_num_rows($result) === 0) {
+            $insert = mysqli_prepare($conn, 'INSERT INTO centre (nomCentre) VALUES (?)');
+            if ($insert) {
+                mysqli_stmt_bind_param($insert, 's', $centre);
+                mysqli_stmt_execute($insert);
+            }
+        }
+    }
+
+    return mysqli_query($conn, "
+        SELECT idCentre, nomCentre
+        FROM centre
+        WHERE nomCentre IN ('Agla', 'Akpakpa', 'Gbegamey', 'Calavi', 'Porto-novo')
+        ORDER BY FIELD(nomCentre, 'Agla', 'Akpakpa', 'Gbegamey', 'Calavi', 'Porto-novo')
+    ");
+}
 ?>

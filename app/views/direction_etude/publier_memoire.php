@@ -45,7 +45,7 @@ $success = '';
 $error = '';
 
 $filieres = mysqli_query($conn, "SELECT idfiliere, nom_filiere FROM filiere ORDER BY nom_filiere ASC");
-$centres = mysqli_query($conn, "SELECT idCentre, nomCentre FROM centre ORDER BY nomCentre ASC");
+$centres = get_de_centres($conn);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $nomAut = trim($_POST['nomAut'] ?? '');
