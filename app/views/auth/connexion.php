@@ -1,4 +1,21 @@
 <?php
+require_once __DIR__ . '/../../../config/database.php';
+
+$filieres = [];
+$niveauOptions = [];
+
+try {
+    $database = new Database();
+    $db = $database->connect();
+
+    $stmt = $db->query('SELECT idfiliere, nom_filiere FROM filiere ORDER BY nom_filiere');
+    $filieres = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $stmt = $db->query('SELECT DISTINCT niveau FROM etudiant ORDER BY niveau');
+    $niveauOptions = $stmt->fetchAll(PDO::FETCH_COLUMN);
+} catch (Exception $e) {
+    $filieres = [];
+    $niveauOptions = [];
 session_start();
 require_once __DIR__ . '/../../../config/database.php';
 
