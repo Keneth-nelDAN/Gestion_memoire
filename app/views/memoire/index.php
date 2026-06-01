@@ -1,11 +1,7 @@
 <?php
-
-
     $nom = $_SESSION['nom'] ?? "User";
     $prenom = $_SESSION['prenom'] ?? "File";
-    $initiales = strtoupper($nom[0] . ($prenom[0] ?? ''));
-
-    
+    $initiales = strtoupper($nom[0] . ($prenom[0] ?? ''));   
 
 ?>
 
@@ -60,7 +56,7 @@
             </div>
             <!-- centres -->
             <div class="dashboard-card">
-                <h1>8</h1>
+                <h1><?= $totalCentres ?></h1>
                 <p>Centres</p>
             </div>
         </div>
@@ -102,7 +98,7 @@
                         </p>
                         <p class="info">
                             <i class="fa-solid fa-book"></i>
-                            <?= $pub['idfiliere'] ?>
+                            <?= $pub['nom_filiere'] ?>
                         </p>
                         <p class="info">
                             <i class="fa-solid fa-location-dot"></i>
@@ -126,18 +122,25 @@
                                         $_SESSION['idetudiant']
                                     );
                                 ?>
-                                <a href="/Gestion_memoire/public/like.php?id=<?= $pub['idAM'] ?>" class="likes">
+                                <a href="/Mon%20document/Gestion_memoire/public/like.php?id=<?= $pub['idAM'] ?>" class="likes">
                                     <i class="fa-solid fa-heart
                                     <?= $isLiked ? 'liked' : '' ?>"></i>
                                     <?= $totalLikes ?>
                                 </a>
                             </span>
                             <span class="comments">
-                                <i class="fa-solid fa-message"></i>
-                                11
+                                <?php
+                                    $totalCommentaires =
+                                    $commentaireModel->countCommentaires($pub['idAM']);
+                                ?>
+
+                                <a href="/Mon%20document/Gestion_memoire/public/detail.php?id=<?= $pub['idAM'] ?>" class="commentaires">
+                                    <i class="fa-solid fa-comment"></i>
+                                    <?= $totalCommentaires ?>
+                                </a>
                             </span>
                         </div>
-                        <a href="#" class="btn-voir">
+                        <a href="/Mon%20document/Gestion_memoire/public/detail.php?id=<?= $pub['idAM'] ?>" target="_blank" class="btn-voir">
                             Voir
                             <i class="fa-solid fa-arrow-right"></i>
                         </a>
