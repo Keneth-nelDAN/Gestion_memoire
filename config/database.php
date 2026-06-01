@@ -1,14 +1,22 @@
-﻿<?php
+<?php
+
 $host = "localhost";
-$user = "root";
+$dbname = "gestion_memoires";
+$username = "root";
 $password = "";
-$database = "gestion_memoires";
 
-$conn = mysqli_connect($host, $user, $password, $database);
+try {
+    $pdo = new PDO(
+        "mysql:host=$host;dbname=$dbname;charset=utf8",
+        $username,
+        $password
+    );
 
-if (!$conn) {
-    die("Erreur de connexion : " . mysqli_connect_error());
+    // Activer les erreurs PDO (très important)
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+    // echo "Connexion réussie"; // (optionnel pour test)
+
+} catch (Exception $e) {
+    die("Erreur de connexion à la base de données : " . $e->getMessage());
 }
-
-mysqli_set_charset($conn, "utf8mb4");
-?>
