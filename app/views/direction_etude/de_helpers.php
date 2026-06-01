@@ -233,4 +233,28 @@ function send_student_credentials_email($email, $prenom, $password, $type_compte
 
     return send_smtp_email($email, $subject, $message, $error);
 }
+function get_de_professeurs($conn) {
+    $result = mysqli_query($conn, "SELECT idprof, nom, prenom, email FROM professeur ORDER BY prenom ASC, nom ASC");
+    return $result ? mysqli_fetch_all($result, MYSQLI_ASSOC) : [];
+}
+
+function get_professeur_name_by_id($conn, $idprof) {
+    $idprof = (int) $idprof;
+    if ($idprof <= 0) {
+        return '';
+    }
+    $stmt = mysqli_prepare($conn, 'SELECT nom, prenom FROM professeur WHERE idprof = ? LIMIT 1');
+    if (!$stmt) {
+        return '';
+    }
+    mysqli_stmt_bind_param($stmt, 'i', $idprof);
+    mysqli_stmt_execute($stmt);
+    $row = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
+    return $row ? trim($row['prenom'] . ' ' . $row['nom']) : '';
+}
+
+function professeur_option_selected($current_name, $prenom, $nom) {
+    return trim((string) $current_name) === trim($prenom . ' ' . $nom) ? 'selected' : '';
+}
 ?>
+

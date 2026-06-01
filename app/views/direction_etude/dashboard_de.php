@@ -17,6 +17,44 @@ $de_profile = get_de_profile($conn);
 $nom_de = $de_profile['nom_de'];
 $initiales_de = $de_profile['initiales_de'];
 ensure_etudiant_account_schema($conn);
+$dashboard_success = '';
+$dashboard_error = '';
+$generated_prof_password = '';
+$default_prof_password = 'Prof@' . random_int(1000, 9999);
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['dashboard_action'] ?? '') === 'add_professeur') {
+    $prof_nom = trim($_POST['prof_nom'] ?? '');
+    $prof_prenom = trim($_POST['prof_prenom'] ?? '');
+    $prof_email = strtolower(trim($_POST['prof_email'] ?? ''));
+    $prof_password = trim($_POST['prof_password'] ?? '');
+
+    if ($prof_password === '') {
+        $prof_password = $default_prof_password;
+    }
+
+    if ($prof_nom === '' || $prof_prenom === '' || !filter_var($prof_email, FILTER_VALIDATE_EMAIL)) {
+        $dashboard_error = 'Veuillez renseigner le nom, le prénom et un email valide pour le professeur.';
+    } else {
+        $check_prof = mysqli_prepare($conn, 'SELECT idprof FROM professeur WHERE email = ? LIMIT 1');
+        mysqli_stmt_bind_param($check_prof, 's', $prof_email);
+        mysqli_stmt_execute($check_prof);
+        $prof_exists = mysqli_stmt_get_result($check_prof);
+
+        if ($prof_exists && mysqli_num_rows($prof_exists) > 0) {
+            $dashboard_error = 'Un professeur utilise déjà cet email.';
+        } else {
+            $insert_prof = mysqli_prepare($conn, 'INSERT INTO professeur (nom, prenom, email, motdepasse) VALUES (?, ?, ?, ?)');
+            mysqli_stmt_bind_param($insert_prof, 'ssss', $prof_nom, $prof_prenom, $prof_email, $prof_password);
+
+            if (mysqli_stmt_execute($insert_prof)) {
+                $generated_prof_password = $prof_password;
+                $dashboard_success = 'Compte professeur créé avec succès depuis le tableau de bord.';
+            } else {
+                $dashboard_error = 'Impossible de créer le compte professeur.';
+            }
+        }
+    }
+}
 
 $search = trim($_GET['q'] ?? '');
 $filiere_filter = (int) ($_GET['filiere'] ?? 0);
@@ -29,9 +67,11 @@ $nb_mois = scalar_count($conn, "SELECT COUNT(*) FROM ancien_memoire WHERE MONTH(
 $nb_etudiants = scalar_count($conn, "SELECT COUNT(*) FROM etudiant");
 $nb_consultants = scalar_count($conn, "SELECT COUNT(*) FROM etudiant WHERE type_compte = 'consultant'");
 $nb_diplomes = scalar_count($conn, "SELECT COUNT(*) FROM etudiant WHERE type_compte = 'diplome'");
+$nb_professeurs = scalar_count($conn, "SELECT COUNT(*) FROM professeur");
 
 $filieres = mysqli_query($conn, "SELECT idfiliere, nom_filiere FROM filiere ORDER BY nom_filiere ASC");
 $annees = mysqli_query($conn, "SELECT DISTINCT annee_academique FROM ancien_memoire WHERE annee_academique IS NOT NULL AND annee_academique <> '' ORDER BY annee_academique DESC");
+$recent_professeurs = mysqli_query($conn, "SELECT idprof, nom, prenom, email FROM professeur ORDER BY idprof DESC LIMIT 4");
 
 $where = [];
 $types = '';
@@ -112,6 +152,17 @@ if ($stmt) {
         <?php if (isset($_GET['status']) && $_GET['status'] === 'deleted'): ?>
             <div class="alert success">Mémoire supprimé avec succès. La liste est actualisée.</div>
         <?php endif; ?>
+        <?php if ($dashboard_success !== ''): ?>
+            <div class="alert success">
+                <?= e($dashboard_success) ?>
+                <?php if ($generated_prof_password !== ''): ?>
+                    Mot de passe provisoire : <strong><?= e($generated_prof_password) ?></strong>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
+        <?php if ($dashboard_error !== ''): ?>
+            <div class="alert error"><?= e($dashboard_error) ?></div>
+        <?php endif; ?>
 
         <section class="cards-container">
             <article class="dashboard-card accent-gold">
@@ -136,7 +187,13 @@ if ($stmt) {
                 <div class="stat-icon"><i class="fa-solid fa-user-graduate"></i></div>
                 <span class="card-label">Étudiants actifs</span>
                 <strong><?= $nb_etudiants ?></strong>
-                <small><?= $nb_consultants ?> consultaires · <?= $nb_diplomes ?> diplômés</small>
+                <small><?= $nb_consultants ?> consultants · <?= $nb_diplomes ?> diplômés</small>
+            </article>
+            <article class="dashboard-card accent-gold">
+                <div class="stat-icon"><i class="fa-solid fa-chalkboard-user"></i></div>
+                <span class="card-label">Professeurs actifs</span>
+                <strong><?= $nb_professeurs ?></strong>
+                <small>Comptes enseignants créés</small>
             </article>
         </section>
 
@@ -144,6 +201,69 @@ if ($stmt) {
             <a href="publier_memoire.php"><i class="fa-solid fa-file-circle-plus"></i><span>Publier un mémoire</span></a>
             <a href="publier_lots.php"><i class="fa-solid fa-cloud-arrow-up"></i><span>Uploader plusieurs fichiers</span></a>
             <a href="etudiants_de.php"><i class="fa-solid fa-users"></i><span>Créer un compte étudiant</span></a>
+            <a href="#ajouter-professeur"><i class="fa-solid fa-user-tie"></i><span>Ajouter professeur</span></a>
+        </section>
+
+        <section class="dashboard-professor-panel" id="ajouter-professeur">
+            <article class="form-card dashboard-professor-form">
+                <div class="section-heading">
+                    <div>
+                        <span class="overline">Comptes enseignants</span>
+                        <h2>Ajouter professeur</h2>
+                        <p>Le DE crée le compte du professeur afin qu'il puisse se connecter ensuite.</p>
+                    </div>
+                    <a class="btn-muted" href="professeurs_de.php"><i class="fa-solid fa-arrow-up-right-from-square"></i> Page professeurs</a>
+                </div>
+
+                <form method="post" class="professional-form">
+                    <input type="hidden" name="dashboard_action" value="add_professeur">
+                    <div class="form-grid">
+                        <label>
+                            <span>Nom</span>
+                            <input type="text" name="prof_nom" placeholder="Ex : Dansou" required>
+                        </label>
+                        <label>
+                            <span>Prénom</span>
+                            <input type="text" name="prof_prenom" placeholder="Ex : Arnaud" required>
+                        </label>
+                        <label>
+                            <span>Email de connexion</span>
+                            <input type="email" name="prof_email" placeholder="professeur@geniememoire.edu" required>
+                        </label>
+                        <label>
+                            <span>Mot de passe provisoire</span>
+                            <input type="text" name="prof_password" value="<?= e($default_prof_password) ?>" required>
+                        </label>
+                    </div>
+                    <div class="form-actions">
+                        <button class="btn-gold" type="submit"><i class="fa-solid fa-user-plus"></i> Créer le compte professeur</button>
+                    </div>
+                </form>
+            </article>
+
+            <article class="form-card dashboard-professor-list">
+                <div class="section-heading">
+                    <div>
+                        <span class="overline">Dernières créations</span>
+                        <h2>Professeurs récents</h2>
+                    </div>
+                </div>
+                <div class="teacher-list compact-teacher-list">
+                    <?php if ($recent_professeurs && mysqli_num_rows($recent_professeurs) > 0): ?>
+                        <?php while ($professeur = mysqli_fetch_assoc($recent_professeurs)): ?>
+                            <div class="teacher-item">
+                                <div class="teacher-avatar"><?= e(strtoupper(substr($professeur['prenom'], 0, 1) . substr($professeur['nom'], 0, 1))) ?></div>
+                                <div>
+                                    <strong><?= e(trim($professeur['prenom'] . ' ' . $professeur['nom'])) ?></strong>
+                                    <small><?= e($professeur['email']) ?></small>
+                                </div>
+                            </div>
+                        <?php endwhile; ?>
+                    <?php else: ?>
+                        <div class="empty-state">Aucun professeur créé pour le moment.</div>
+                    <?php endif; ?>
+                </div>
+            </article>
         </section>
 
         <section class="table-container" id="publications">
@@ -209,6 +329,7 @@ if ($stmt) {
 </div>
 </body>
 </html>
+
 
 
 
