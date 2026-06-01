@@ -3,6 +3,9 @@
     padding: 0;
     box-sizing:border-box;
 }
+body{
+    user-select: none;
+}
 main{
     background: #f4f6f8;
     min-height: 100vh;
@@ -160,8 +163,6 @@ main{
     background: white;
     border-radius: 10px;
     font-size:14px;
-    margin-left: 30px;
-    margin:100px auto;
 }
 
 /* bouton */
@@ -337,4 +338,256 @@ main{
 
 .liked{
     color: #ff4d6d;
+}
+
+/* commentaires */
+.commentaires{
+    color: #09315e;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.commentaires i{
+    font-size: 18px;
+}
+
+/* Page de détail */
+body{
+    background:#f5f7fb;
+    font-family:Arial, sans-serif;
+    margin:0;
+}
+
+.detail-container{
+    max-width:1400px;
+    margin:auto;
+    padding:25px;
+}
+
+.detail-header{
+    background:#fff;
+    padding:25px;
+    border-radius:12px;
+    margin-bottom:20px;
+}
+
+.auteur{
+    display:flex;
+    align-items:center;
+    gap:15px;
+}
+
+.avatar{
+    width:60px;
+    height:60px;
+    border-radius:50%;
+    background:#09315e;
+    color:#fff;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:bold;
+}
+
+.infos-auteur h3{
+    margin:0;
+}
+
+.infos-secondaires{
+    margin-top:5px;
+    display:flex;
+    gap:15px;
+    color:#777;
+    font-size:14px;
+}
+
+.theme{
+    margin-top:20px;
+    color:#09315e;
+}
+
+.contenu-detail{
+    display:flex;
+    gap:20px;
+    align-items:flex-start;
+}
+
+.pdf-section{
+    flex:3;
+    background:#fff;
+    padding:15px;
+    border-radius:12px;
+}
+
+.pdf-section iframe{
+    border:none;
+}
+
+.jury{
+    flex:1;
+    background:#fff;
+    padding:20px;
+    border-radius:12px;
+}
+
+.jury h3{
+    margin-top:0;
+    color:#09315e;
+}
+
+.membre-jury{
+    margin-bottom:20px;
+}
+
+.stats{
+    display:flex;
+    gap:30px;
+    margin:25px 0;
+    background:#fff;
+    padding:20px;
+    border-radius:12px;
+}
+
+.stat-item{
+    font-size:18px;
+    font-weight:bold;
+}
+
+.commentaires{
+    background:#fff;
+    padding:20px;
+    border-radius:12px;
+}
+
+.commentaire{
+    display:flex;
+    gap:15px;
+    margin-bottom:20px;
+    padding-bottom:15px;
+    border-bottom:1px solid #eee;
+}
+
+.avatar-comment{
+    width:45px;
+    height:45px;
+    border-radius:50%;
+    background:#09315e;
+    color:#fff;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+}
+
+.contenu-commentaire{
+    flex:1;
+}
+
+.comment-head{
+    display:flex;
+    justify-content:space-between;
+    margin-bottom:8px;
+}
+
+.comment-head span{
+    color:#888;
+    font-size:13px;
+}
+
+.ajout-commentaire{
+    margin-top:20px;
+    background:#fff;
+    padding:20px;
+    border-radius:12px;
+}
+
+textarea{
+    width:100%;
+    height:100px;
+    resize:none;
+    padding:12px;
+    border:1px solid #ddd;
+    border-radius:8px;
+}
+
+button{
+    margin-top:10px;
+    background:#09315e;
+    color:white;
+    border:none;
+    padding:10px 25px;
+    border-radius:8px;
+    cursor:pointer;
+}
+/* commentaires */
+.commentaires-liste
+{
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.commentaire
+{
+    display: block;
+    padding: 12px;
+    border-bottom: 1px solid #ddd;
+}
+
+.commentaire-header
+{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.avatar
+{
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #1e88e5;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+}
+
+.commentaire-nom
+{
+    font-weight: bold;
+}
+
+.commentaire-date
+{
+    font-size: 12px;
+    color: #777;
+}
+
+.commentaire-contenu
+{
+    margin-left: 50px;
+    line-height: 1.5;
+}
+
+.sidebar
+{
+    width: 320px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.jury,
+.interaction-card,
+.commentaires-section,
+.ajout-commentaire
+{
+    background: white;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.08);
 }
