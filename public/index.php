@@ -1,27 +1,22 @@
 <?php
-require_once "../config/database.php";
-require_once "../app/controllers/dashboardController.php";
-require_once "../app/controllers/PublicationController.php";
+// Charger les fichiers requis de manière robuste à l'aide de chemins absolus
+require_once __DIR__ . "/../config/database.php";
+require_once __DIR__ . "/../app/models/dashboard.php";
+require_once __DIR__ . "/../app/models/memoire.php"; // respect de la minuscule
 
-require_once "../config/database.php";
-
+// Obtenir la connexion PDO
 $database = new Database();
-$pdo = $database->connect(); // Initialise $pdo pour les modèles et requêtes
+$pdo = $database->connect();
 
-// niveau choisi
+if (!$pdo) {
+    die("Échec d'initialisation de la base de données.");
+}
+
+// Récupérer le filtre de niveau
 $niveau = $_GET['niveau'] ?? "Tous";
 
-// model mémoire
-$memoireModel = new Memoire($pdo);
-
-// récupérer mémoires
-$memoires = $memoireModel->getMemoires($niveau);
-
+// Charger et exécuter le contrôleur principal
+require_once __DIR__ . "/../app/controllers/dashboardController.php";
 $controller = new dashboardController();
-
-$memoireModel = new Memoire($pdo);
-$memoires = $memoireModel->getMemoires($niveau);
-$controller = new PublicationController();
-
 $controller->index();
 ?>
