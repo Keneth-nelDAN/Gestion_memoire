@@ -36,11 +36,6 @@ class PublicationController {
         $search = trim($_GET['search'] ?? '');
 
         $niveau = $niveauParam;
-        if ($niveauParam === 'L3') {
-            $niveau = 'Licence 3';
-        } elseif ($niveauParam === 'M2') {
-            $niveau = 'Master 2';
-        }
 
         $publicationModel = new Publication($pdo);
         $likeModel = new Like($pdo);

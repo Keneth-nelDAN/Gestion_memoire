@@ -222,8 +222,21 @@ class Publication {
         $params = [];
 
         if ($niveau != 'Tous') {
-            $sql .= " AND niveau.nomNiveau = ?";
-            $params[] = $niveau;
+            $niveauValues = [$niveau];
+            if ($niveau === 'L3') {
+                $niveauValues = ['L3', 'Licence 3'];
+            } elseif ($niveau === 'M2') {
+                $niveauValues = ['M2', 'Master 2'];
+            }
+
+            if (count($niveauValues) === 1) {
+                $sql .= " AND niveau.nomNiveau = ?";
+                $params[] = $niveauValues[0];
+            } else {
+                $sql .= " AND (niveau.nomNiveau = ? OR niveau.nomNiveau = ?)";
+                $params[] = $niveauValues[0];
+                $params[] = $niveauValues[1];
+            }
         }
 
         if (!empty($mot)) {
@@ -282,8 +295,21 @@ class Publication {
         $params = [];
 
         if ($niveau != 'Tous') {
-            $sql .= " AND niveau.nomNiveau = ?";
-            $params[] = $niveau;
+            $niveauValues = [$niveau];
+            if ($niveau === 'L3') {
+                $niveauValues = ['L3', 'Licence 3'];
+            } elseif ($niveau === 'M2') {
+                $niveauValues = ['M2', 'Master 2'];
+            }
+
+            if (count($niveauValues) === 1) {
+                $sql .= " AND niveau.nomNiveau = ?";
+                $params[] = $niveauValues[0];
+            } else {
+                $sql .= " AND (niveau.nomNiveau = ? OR niveau.nomNiveau = ?)";
+                $params[] = $niveauValues[0];
+                $params[] = $niveauValues[1];
+            }
         }
 
         if (!empty($mot)) {

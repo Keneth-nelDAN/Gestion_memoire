@@ -1,6 +1,6 @@
 <?php
-$currentPage = basename($_SERVER['SCRIPT_NAME']);
-$showDepositButton = !in_array($currentPage, ['profil.php', 'mes_memoires.php']);
+$etudiantNiveau = $etudiant['nomNiveau'] ?? $_SESSION['nomNiveau'] ?? '';
+$showActions = in_array($etudiantNiveau, ['L3', 'M2']);
 ?>
 <header class="navbar">
         <div class="logo">
@@ -13,7 +13,7 @@ $showDepositButton = !in_array($currentPage, ['profil.php', 'mes_memoires.php'])
             <input type="text" placeholder="Rechercher par titre, filière, professeur...">
         </div>-->
         <div class="menu">
-            <?php if ($showDepositButton): ?>
+            <?php if ($showActions): ?>
             <a href="depot.php" class="btn-depot">
                 <i class="fa-solid fa-upload"></i> Déposer un mémoire
             </a>
@@ -34,9 +34,11 @@ $showDepositButton = !in_array($currentPage, ['profil.php', 'mes_memoires.php'])
                 <a href="profil.php">
                     Mon profil
                 </a>
+                <?php if ($showActions): ?>
                 <a href="mes_memoires.php">
                     Mes mémoires
                 </a>
+                <?php endif; ?>
                 <a href="logout.php" class="logout-link">
                     Déconnexion
                 </a>

@@ -2,7 +2,8 @@
     $nom = $_SESSION['nom'] ?? "User";
     $prenom = $_SESSION['prenom'] ?? "File";
     $initiales = strtoupper($nom[0] . ($prenom[0] ?? ''));
-
+    $etudiantNiveau = $etudiant['nomNiveau'] ?? $_SESSION['nomNiveau'] ?? '';
+    $showActions = in_array($etudiantNiveau, ['L3', 'M2']);
 ?>
 
 <!DOCTYPE html>
@@ -38,9 +39,11 @@
             </div>
         </form>
         <div class="menu">
+            <?php if ($showActions): ?>
             <a href="depot.php" class="btn-depot">
                 <i class="fa-solid fa-upload"></i> Déposer un mémoire
             </a>
+            <?php endif; ?>
         </div>
         <div class="profile-menu">
             <div class="profile-btn">
@@ -57,9 +60,11 @@
                 <a href="profil.php">
                     Mon profil
                 </a>
+                <?php if ($showActions): ?>
                 <a href="mes_memoires.php">
                     Mes mémoires
                 </a>
+                <?php endif; ?>
                 <a href="logout.php" class="logout-link">
                     Déconnexion
                 </a>
