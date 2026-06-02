@@ -1,7 +1,6 @@
 <?php
-
 class Database {
-    private $host = 'localhost';
+    private $host = '127.0.0.1'; // Utiliser 127.0.0.1 résout souvent les latences DNS locales sous Windows (WAMP)
     private $db_name = 'gestion_memoires';
     private $user = 'root';
     private $password = '';
@@ -13,7 +12,7 @@ class Database {
 
         try {
             $this->conn = new PDO(
-                'mysql:host=127.0.0.1;dbname=' . $this->db_name . ';charset=utf8mb4',
+                'mysql:host=' . $this->host . ';dbname=' . $this->db_name . ';charset=utf8mb4',
                 $this->user,
                 $this->password
             );
