@@ -1,5 +1,8 @@
 <?php
+<<<<<<< HEAD
 
+=======
+>>>>>>> bf59ca851dd3875f42f95168629b5b5dd69aeb72
 class Database {
     private $host = 'localhost';
     private $db_name = 'gestion_memoires';
