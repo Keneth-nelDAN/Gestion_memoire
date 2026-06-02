@@ -32,11 +32,8 @@ if (!isset($initiales_de)) {
             <i class="fa-solid fa-table-cells-large"></i> Tableau de bord
         </a>
         <p>Gestion des mémoires</p>
-        <a class="<?= $active_page === 'publications' ? 'active' : '' ?>" href="publier_memoire.php">
-            <i class="fa-solid fa-upload"></i> Publier un mémoire
-        </a>
-        <a class="<?= $active_page === 'anciens' ? 'active' : '' ?>" href="dashboard_de.php#publications">
-            <i class="fa-solid fa-book-open-reader"></i> Anciens mémoires
+        <a class="<?= $active_page === 'publications' ? 'active' : '' ?>" href="publications.php">
+            <i class="fa-solid fa-upload"></i> Publier des mémoires
         </a>
         <a class="<?= $active_page === 'notifications' ? 'active' : '' ?>" href="notifications.php">
             <i class="fa-solid fa-bell"></i> Notifications

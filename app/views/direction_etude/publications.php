@@ -1,7 +1,14 @@
 ﻿<?php
 session_start();
 require_once __DIR__ . '/../../../config/database.php';
+require_once __DIR__ . '/../../../config/mysqli_config.php';
 require_once __DIR__ . '/de_helpers.php';
+
+// Vérifier que l'utilisateur est un directeur
+if (empty($_SESSION['idde']) && (empty($_SESSION['user']) || $_SESSION['user']['type'] !== 'directeur')) {
+    header('Location: ../auth/connexion.php');
+    exit;
+}
 
 function upload_pdf_file($file, $upload_dir, &$error) {
     if (!isset($file) || $file['error'] === UPLOAD_ERR_NO_FILE) {

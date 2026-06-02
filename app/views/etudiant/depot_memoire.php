@@ -1,6 +1,7 @@
 ﻿<?php
 session_start();
 require_once __DIR__ . '/../../../config/database.php';
+require_once __DIR__ . '/../../../config/mysqli_config.php';
 
 if (empty($_SESSION['idetudiant'])) {
     header('Location: ../auth/connexion.php');
