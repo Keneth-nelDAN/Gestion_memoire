@@ -1,6 +1,7 @@
 <?php
+
 class Database {
-    private $host = '127.0.0.1'; // Utiliser 127.0.0.1 résout souvent les latences DNS locales sous Windows (WAMP)
+    private $host = '127.0.0.1';
     private $db_name = 'gestion_memoires';
     private $user = 'root';
     private $password = '';
