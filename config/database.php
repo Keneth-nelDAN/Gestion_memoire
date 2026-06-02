@@ -1,27 +1,22 @@
 <?php
 
-class Database {
-    private $host = 'localhost';
-    private $db_name = 'gestion_memoires';
-    private $user = 'root';
-    private $password = '';
-    private $conn;
+$host = "localhost";
+$dbname = "gestion_memoires";
+$username = "root";
+$password = "";
 
-    // Établir la connexion à la base de données
-    public function connect() {
-        $this->conn = null;
+try {
+    $pdo = new PDO(
+        "mysql:host=$host;dbname=$dbname;charset=utf8",
+        $username,
+        $password
+    );
 
-        try {
-            $this->conn = new PDO(
-                'mysql:host=127.0.0.1;dbname=' . $this->db_name . ';charset=utf8mb4',
-                $this->user,
-                $this->password
-            );
-            $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        } catch (PDOException $e) {
-            echo 'Erreur de connexion : ' . $e->getMessage();
-        }
+    // Activer les erreurs PDO (très important)
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-        return $this->conn;
-    }
+    // echo "Connexion réussie"; // (optionnel pour test)
+
+} catch (Exception $e) {
+    die("Erreur de connexion à la base de données : " . $e->getMessage());
 }
