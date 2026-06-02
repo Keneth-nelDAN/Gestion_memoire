@@ -528,7 +528,7 @@ try {
         <div class="login-right">
             <div class="tab-buttons">
                 <button class="tab-btn active">Se connecter</button>
-                <a class="tab-btn" href="/Gestion_memoire/app/views/auth/inscription.php">Créer un compte</a>
+                <!-- <a class="tab-btn" href="/Gestion_memoire/app/views/auth/inscription.php">Créer un compte</a> -->
             </div>
 
             <h2 class="welcome-title">Bienvenue</h2>
