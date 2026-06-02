@@ -2,7 +2,7 @@
 require_once "../config/database.php";
 require_once "../app/models/dashboard.php";
 require_once "../app/models/memoire.php";
-require_once "../app/models/Publication.php";
+require_once "../app/models/publication.php";
 require_once "../app/models/like.php";
 
 class dashboardController {
