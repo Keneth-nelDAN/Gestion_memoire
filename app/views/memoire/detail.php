@@ -13,6 +13,11 @@
 <body>
     <div class="detail-container">
 
+        <a href="/Mon%20document/Gestion_memoire/public/" class="back-link">
+            <i class="fa-solid fa-arrow-left"></i>
+            Retour à l'accueil
+        </a>
+
         <!-- ENTETE -->
         <div class="detail-header">
 
@@ -23,10 +28,10 @@
                 </div>
 
                 <div class="infos-auteur">
-                    <h3>
+                    <h4>
                         <?= $memoire['prenomAut'] ?>
                         <?= $memoire['nomAut'] ?>
-                    </h3>
+                    </h4>
 
                     <div class="infos-secondaires">
 
@@ -42,9 +47,9 @@
                 </div>
             </div>
 
-            <h1 class="theme">
+            <h3 class="theme">
                 <?= $memoire['theme'] ?>
-            </h1>
+            </h3>
 
         </div>
 
@@ -85,8 +90,6 @@
 
                 </div>
 
-            
-
                 <!-- LIKES + COMMENTAIRES -->
                 <div class="stats">
                                     <span class="likes">
@@ -97,9 +100,8 @@
                                                 $_SESSION['idetudiant']
                                             );
                                         ?>
-                                        <a href="/Mon%20document/Gestion_memoire/public/like.php?id=<?= $memoire['idAM'] ?>" class="likes">
-                                            <i class="fa-solid fa-heart
-                                            <?= $isLiked ? 'liked' : '' ?>"></i>
+                                        <a href="/Mon%20document/Gestion_memoire/public/like.php?id=<?= $memoire['idAM'] ?>" class="likes ajax-like" data-id="<?= $memoire['idAM'] ?>">
+                                            <i class="fa-solid fa-heart <?= $isLiked ? 'liked' : '' ?>"></i>
                                             <?= $totalLikes ?>
                                         </a>
                                     </span>
@@ -124,13 +126,19 @@
 
                 <div class="commentaires-liste">
 
+                    <?php if(empty($commentaires)): ?>
+                        <div class="commentaire empty-comments">
+                            Aucun commentaire pour le moment.
+                        </div>
+                    <?php endif; ?>
+
                     <?php foreach($commentaires as $commentaire): ?>
 
                         <div class="commentaire">
 
                             <div class="commentaire-header">
 
-                                <div class="avatar">
+                                <div class="avatar-comment">
                                     <?= strtoupper(substr($commentaire['nom'],0,1)) ?>
                                 </div>
 
@@ -148,7 +156,7 @@
                             </div>
 
                             <div class="commentaire-contenu">
-                                <?= $commentaire['contenu'] ?>
+                                <?= nl2br(htmlspecialchars($commentaire['contenu'])) ?>
                             </div>
 
                         </div>
@@ -156,6 +164,16 @@
                     <?php endforeach; ?>
 
                 </div>
+
+                <?php if($nombrePagesCommentaires > 1): ?>
+                    <div class="commentaires-pagination">
+                        <?php for($i = 1; $i <= $nombrePagesCommentaires; $i++): ?>
+                            <a href="?id=<?= $memoire['idAM'] ?>&page=<?= $i ?>" class="comment-page-link <?= ($pageComments == $i) ? 'active' : '' ?>">
+                                <?= $i ?>
+                            </a>
+                        <?php endfor; ?>
+                    </div>
+                <?php endif; ?>
 
                 </div>
 

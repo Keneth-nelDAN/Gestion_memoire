@@ -38,6 +38,27 @@ class Commentaire {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    public function getCommentairesPaginated($idAM, $debut, $limite)
+    {
+        $sql = "SELECT commentaire.*,
+                       etudiant.nom,
+                       etudiant.prenom
+                FROM commentaire
+                LEFT JOIN etudiant
+                ON commentaire.idetudiant = etudiant.idetudiant
+                WHERE idAM = ?
+                ORDER BY date_commentaire DESC
+                LIMIT ?, ?";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->bindValue(1, $idAM, PDO::PARAM_INT);
+        $stmt->bindValue(2, $debut, PDO::PARAM_INT);
+        $stmt->bindValue(3, $limite, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     public function ajouter($contenu,$idAM,$idetudiant)
     {
         $sql = "INSERT INTO commentaire

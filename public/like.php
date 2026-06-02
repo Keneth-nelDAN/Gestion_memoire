@@ -6,12 +6,19 @@ if(session_status() == PHP_SESSION_NONE){
     session_start();
 }
 
-// étudiant temporaire
-$_SESSION['idetudiant'] = 1;
+if(!isset($_SESSION['idetudiant'])) {
+    $_SESSION['idetudiant'] = 1;
+}
 
 // vérifier id
 if(!isset($_GET['id']))
 {
+    if(isset($_GET['ajax'])) {
+        header('Content-Type: application/json');
+        echo json_encode(['error' => 'ID introuvable']);
+        exit;
+    }
+
     die("ID introuvable");
 }
 
@@ -27,6 +34,19 @@ if($likeModel->isLiked($idAM, $idetudiant))
 else
 {
     $likeModel->addLike($idAM, $idetudiant);
+}
+
+$liked = $likeModel->isLiked($idAM, $idetudiant);
+$totalLikes = $likeModel->countLikes($idAM);
+
+if(isset($_GET['ajax'])) {
+    header('Content-Type: application/json');
+    echo json_encode([
+        'idAM' => $idAM,
+        'liked' => $liked,
+        'totalLikes' => (int)$totalLikes,
+    ]);
+    exit;
 }
 
 // retour accueil

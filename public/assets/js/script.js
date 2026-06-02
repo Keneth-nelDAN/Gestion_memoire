@@ -59,3 +59,42 @@ document.addEventListener("keydown", function(e){
         e.preventDefault();
     }
 });
+
+document.addEventListener("DOMContentLoaded", function() {
+    document.querySelectorAll("a.ajax-like").forEach(function(link) {
+        link.addEventListener("click", function(event) {
+            event.preventDefault();
+
+            var url = new URL(this.href, window.location.origin);
+            url.searchParams.set('ajax', '1');
+
+            var currentLink = this;
+            fetch(url.toString(), {
+                credentials: 'same-origin'
+            })
+            .then(function(response) {
+                return response.json();
+            })
+            .then(function(data) {
+                if (!data || typeof data.totalLikes === 'undefined') {
+                    return;
+                }
+
+                var icon = currentLink.querySelector('i.fa-heart');
+                if (icon) {
+                    if (data.liked) {
+                        icon.classList.add('liked');
+                    } else {
+                        icon.classList.remove('liked');
+                    }
+                }
+
+                currentLink.innerHTML = '<i class="fa-solid fa-heart ' + (data.liked ? 'liked' : '') + '"></i> ' + data.totalLikes;
+                currentLink.setAttribute('data-id', data.idAM);
+            })
+            .catch(function(error) {
+                console.error('Erreur like AJAX :', error);
+            });
+        });
+    });
+});

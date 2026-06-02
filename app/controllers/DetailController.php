@@ -14,7 +14,7 @@ class DetailController
             session_start();
         }
 
-        $_SESSION['idetudiant'] = 1;
+        $_SESSION['idetudiant'] = 2;
 
         if(!isset($_GET['id']))
         {
@@ -35,8 +35,17 @@ class DetailController
         $totalCommentaires =
         $commentaireModel->countCommentaires($memoire['idAM']);
 
+        $pageComments = max(1, (int)($_GET['page'] ?? 1));
+        $commentairesParPage = 3;
+        $debutCommentaires = ($pageComments - 1) * $commentairesParPage;
+        $nombrePagesCommentaires = $totalCommentaires > 0 ? ceil($totalCommentaires / $commentairesParPage) : 1;
+
         $commentaires =
-        $commentaireModel->getCommentaires($memoire['idAM']);
+        $commentaireModel->getCommentairesPaginated(
+            $memoire['idAM'], 
+            $debutCommentaires,
+            $commentairesParPage
+        );
 
         require "../app/views/memoire/detail.php";
     }

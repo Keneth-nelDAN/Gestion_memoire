@@ -4,6 +4,7 @@ require_once "../app/models/Publication.php";
 require_once "../app/models/Dashboard.php";
 require_once "../app/models/Like.php";
 require_once "../app/models/Commentaire.php";
+require_once "../app/models/Etudiant.php";
 
 class PublicationController {
 
@@ -12,7 +13,10 @@ class PublicationController {
         if(session_status() == PHP_SESSION_NONE){
             session_start();
         }
-        $_SESSION['idetudiant'] = 1;
+
+        if(!isset($_SESSION['idetudiant'])) {
+            $_SESSION['idetudiant'] = 1;
+        }
 
         global $pdo;
 
@@ -28,32 +32,38 @@ class PublicationController {
         // ======================
         // FILTRE
         // ======================
+        $niveauParam = $_GET['niveau'] ?? 'Tous';
+        $search = trim($_GET['search'] ?? '');
 
-        $niveau = $_GET['niveau'] ?? 'Tous';
-
-        // ======================
-        // PUBLICATIONS
-        // ======================
+        $niveau = $niveauParam;
+        if ($niveauParam === 'L3') {
+            $niveau = 'Licence 3';
+        } elseif ($niveauParam === 'M2') {
+            $niveau = 'Master 2';
+        }
 
         $publicationModel = new Publication($pdo);
-
-        if($niveau == 'Tous')
-        {
-            $publications = $publicationModel->getAll();
-        }
-        else
-        {
-            $publications = $publicationModel->getByNiveau($niveau);
-        }
-
-        $memoireModel = new Memoire($pdo);
-        $memoires = $memoireModel->getMemoires($niveau);
-        //likes
         $likeModel = new Like($pdo);
-
-        // commentaires
         $commentaireModel = new Commentaire($pdo);
+        $etudiantModel = new Etudiant($pdo);
 
-         require "../app/views/memoire/index.php";
+        $etudiant = $etudiantModel->getById($_SESSION['idetudiant']);
+        $etudiantNiveau = $etudiant['nomNiveau'] ?? '';
+
+        $limite = 6;
+        $page = max(1, (int)($_GET['page'] ?? 1));
+        $debut = ($page - 1) * $limite;
+
+        $totalResultats = $publicationModel->countFiltered($niveau, $search);
+        $nombrePages = $totalResultats > 0 ? ceil($totalResultats / $limite) : 1;
+
+        $publications = $publicationModel->rechercherEtFiltrerPaginated(
+            $niveau,
+            $search,
+            $debut,
+            $limite
+        );
+
+        require "../app/views/memoire/index.php";
     }
 }

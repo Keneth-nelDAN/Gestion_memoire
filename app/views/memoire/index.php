@@ -1,7 +1,7 @@
 <?php
     $nom = $_SESSION['nom'] ?? "User";
     $prenom = $_SESSION['prenom'] ?? "File";
-    $initiales = strtoupper($nom[0] . ($prenom[0] ?? ''));   
+    $initiales = strtoupper($nom[0] . ($prenom[0] ?? ''));
 
 ?>
 
@@ -17,27 +17,54 @@
 <body>
     <header class="navbar">
         <div class="logo">
-            <h2>📚 GASA-Archive</h2>
+            <h2>📚  GénieMémoire</h2>
             <small>Plateforme universitaire</small>
         </div>
         <!-- RECHERCHE -->
-        <div class="search-bar">
-            <i class="fa-solid fa-magnifying-glass"></i>
-            <input type="text" placeholder="Rechercher par titre, filière, professeur...">
-        </div>
+        <form method="GET" action="">
+            <div class="search-bar">
+                <i class="fa-solid fa-magnifying-glass"></i>
+
+                <input
+                    type="text"
+                    name="search"
+                    value="<?= htmlspecialchars($search ?? '') ?>"
+                    placeholder="Rechercher par titre, filière, centre, ...">
+                <input type="hidden" name="niveau" value="<?= htmlspecialchars($niveauParam ?? $niveau ?? 'Tous') ?>">
+
+                <button type="submit">
+                    Rechercher
+                </button>
+            </div>
+        </form>
         <div class="menu">
-            <a href="notifications.php" class="icon">
-                <i class="fa-solid fa-bell"></i>
-            </a>
             <a href="depot.php" class="btn-depot">
                 <i class="fa-solid fa-upload"></i> Déposer un mémoire
             </a>
-            <a href="profil.php" class="profile">
+        </div>
+        <div class="profile-menu">
+            <div class="profile-btn">
+                <a href="profil.php" class="profile">
                 <div class="avatar">
                     <?= $initiales ?>
                 </div>
                 <span><?= $nom . " " . $prenom ?></span>
-            </a>
+                </a>
+            </div>
+
+
+            <div class="profile-dropdown">
+                <a href="profil.php">
+                    Mon profil
+                </a>
+                <a href="mes_memoires.php">
+                    Mes mémoires
+                </a>
+                <a href="logout.php" class="logout-link">
+                    Déconnexion
+                </a>
+            </div>
+
         </div>
     </header>
 
@@ -61,11 +88,12 @@
             </div>
         </div>
 
+        <?php $searchParam = !empty($search) ? '&search=' . urlencode($search) : ''; ?>
         <!-- FILTRES -->
         <div class="filtres">
-            <a href="?niveau=Tous" class="filtre-btn <?= ($niveau == 'Tous') ? 'active' : '' ?>">Tous</a>
-            <a href="?niveau=L3" class="filtre-btn <?= ($niveau == 'L3') ? 'active' : '' ?>">Licence 3</a>
-            <a href="?niveau=M2" class="filtre-btn <?= ($niveau == 'M2') ? 'active' : '' ?>">Master 2</a>
+            <a href="?niveau=Tous<?= $searchParam ?>" class="filtre-btn <?= ($niveauParam == 'Tous') ? 'active' : '' ?>">Tous</a>
+            <a href="?niveau=L3<?= $searchParam ?>" class="filtre-btn <?= ($niveauParam == 'L3') ? 'active' : '' ?>">Licence 3</a>
+            <a href="?niveau=M2<?= $searchParam ?>" class="filtre-btn <?= ($niveauParam == 'M2') ? 'active' : '' ?>">Master 2</a>
         </div>
 
         <!-- PUBLICATIONS -->
@@ -73,6 +101,9 @@
             Mémoires récents
         </h2>
         <div class="publications">
+            <?php if (empty($publications)): ?>
+                <p class="empty-message">Aucun mémoire trouvé pour ces critères.</p>
+            <?php endif; ?>
             <?php foreach($publications as $pub): ?>
                 <div class="publication-card">
 
@@ -122,9 +153,8 @@
                                         $_SESSION['idetudiant']
                                     );
                                 ?>
-                                <a href="/Mon%20document/Gestion_memoire/public/like.php?id=<?= $pub['idAM'] ?>" class="likes">
-                                    <i class="fa-solid fa-heart
-                                    <?= $isLiked ? 'liked' : '' ?>"></i>
+                                <a href="/Mon%20document/Gestion_memoire/public/like.php?id=<?= $pub['idAM'] ?>" class="likes ajax-like" data-id="<?= $pub['idAM'] ?>">
+                                    <i class="fa-solid fa-heart <?= $isLiked ? 'liked' : '' ?>"></i>
                                     <?= $totalLikes ?>
                                 </a>
                             </span>
@@ -141,7 +171,7 @@
                             </span>
                         </div>
                         <a href="/Mon%20document/Gestion_memoire/public/detail.php?id=<?= $pub['idAM'] ?>" target="_blank" class="btn-voir">
-                            Voir
+                            Consulter
                             <i class="fa-solid fa-arrow-right"></i>
                         </a>
                     </div>
@@ -149,6 +179,18 @@
             <?php endforeach; ?>
         </div>
     </main>
+    <div class="pagination">
 
+        <?php for($i=1;$i<=$nombrePages;$i++): ?>
+
+        <a href="?page=<?= $i ?>&niveau=<?= urlencode($niveau) ?><?= $searchParam ?>" class="<?= ($page == $i) ? 'active' : '' ?>">
+            <?= $i ?>
+        </a>
+
+        <?php endfor; ?>
+
+    </div>
+
+    <script src="/Mon%20document/Gestion_memoire/public/assets/js/script.js"></script>
 </body>
 </html>
