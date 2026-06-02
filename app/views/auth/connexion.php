@@ -1,5 +1,4 @@
 <?php
-<<<<<<< HEAD
 require_once __DIR__ . '/../../../config/database.php';
 
 $filieres = [];
@@ -17,65 +16,6 @@ try {
 } catch (Exception $e) {
     $filieres = [];
     $niveauOptions = [];
-=======
-session_start();
-require_once __DIR__ . '/../../../config/database.php';
-
-$error = '';
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $email = strtolower(trim($_POST['email'] ?? ''));
-    $password = trim($_POST['motdepasse'] ?? '');
-    $role = $_POST['role'] ?? 'etudiant';
-
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL) || $password === '') {
-        $error = 'Veuillez saisir un email valide et un mot de passe.';
-    } elseif ($role === 'etudiant') {
-        $column = mysqli_query($conn, "SHOW COLUMNS FROM etudiant LIKE 'type_compte'");
-        if (!$column || mysqli_num_rows($column) === 0) {
-            mysqli_query($conn, "ALTER TABLE etudiant ADD type_compte varchar(20) NOT NULL DEFAULT 'consultant' AFTER motdepasse");
-        }
-        $stmt = mysqli_prepare($conn, 'SELECT idetudiant, nom, prenom, email, motdepasse, type_compte FROM etudiant WHERE email = ? LIMIT 1');
-        mysqli_stmt_bind_param($stmt, 's', $email);
-        mysqli_stmt_execute($stmt);
-        $user = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
-
-        if ($user && hash_equals((string) $user['motdepasse'], $password)) {
-            $_SESSION['idetudiant'] = (int) $user['idetudiant'];
-            $_SESSION['nom_etudiant'] = trim($user['prenom'] . ' ' . $user['nom']);
-            $_SESSION['type_compte_etudiant'] = $user['type_compte'] ?: 'consultant';
-            header('Location: ../etudiant/dashboard_etudiant.php');
-            exit;
-        }
-        $error = 'Identifiants étudiant incorrects.';
-    } elseif ($role === 'professeur') {
-        $stmt = mysqli_prepare($conn, 'SELECT idprof, nom, prenom, motdepasse FROM professeur WHERE email = ? LIMIT 1');
-        mysqli_stmt_bind_param($stmt, 's', $email);
-        mysqli_stmt_execute($stmt);
-        $user = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
-
-        if ($user && hash_equals((string) $user['motdepasse'], $password)) {
-            $_SESSION['idprof'] = (int) $user['idprof'];
-            $_SESSION['nom_professeur'] = trim($user['prenom'] . ' ' . $user['nom']);
-            header('Location: ../professeur/dashboard_professeur.php');
-            exit;
-        }
-        $error = 'Identifiants professeur incorrects.';
-    } else {
-        $stmt = mysqli_prepare($conn, 'SELECT idde, nom, prenom, motdepasse FROM direction_etude WHERE email = ? LIMIT 1');
-        mysqli_stmt_bind_param($stmt, 's', $email);
-        mysqli_stmt_execute($stmt);
-        $user = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
-
-        if ($user && hash_equals((string) $user['motdepasse'], $password)) {
-            $_SESSION['idde'] = (int) $user['idde'];
-            $_SESSION['nom_de'] = trim($user['prenom'] . ' ' . $user['nom']);
-            header('Location: ../direction_etude/dashboard_de.php');
-            exit;
-        }
-        $error = 'Identifiants Direction des Études incorrects.';
-    }
->>>>>>> bf59ca851dd3875f42f95168629b5b5dd69aeb72
 }
 ?>
 <!DOCTYPE html>
@@ -116,8 +56,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             transform: translateY(0);
             transition: transform 200ms ease, box-shadow 200ms ease;
         }
-
-        
 
         .login-container {
             display: flex;
@@ -175,10 +113,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             justify-content: center;
             width: 100%;
             max-width: 400px;
-        }
-
-        .login-left.register-active .brand-content {
-            justify-content: flex-end;
         }
 
         .brand-title {
@@ -429,7 +363,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             color: #d4af37;
             text-decoration: none;
             font-weight: 600;
-            transition: all 0.3s ease;
         }
 
         .forgot-password:hover {
@@ -595,7 +528,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="login-right">
             <div class="tab-buttons">
                 <button class="tab-btn active">Se connecter</button>
-                <!-- <a class="tab-btn" href="/Gestion_memoire/app/views/auth/inscription.php">Créer un compte</a> -->
+                <a class="tab-btn" href="/Gestion_memoire/app/views/auth/inscription.php">Créer un compte</a>
             </div>
 
             <h2 class="welcome-title">Bienvenue</h2>
@@ -624,7 +557,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div id="loginPanel">
                 <div class="form-title">Bienvenue</div>
                 <p class="subtext">Connectez-vous à votre espace personnel.</p>
-                <form id="loginForm">
+                <form id="loginForm" method="POST" action="/Gestion_memoire/public/login.php">
                 <div class="form-group">
                     <label for="email">Adresse Email</label>
                     <input type="email" id="email" name="email" placeholder="votre@email.com" required>
@@ -649,7 +582,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </button>
 
                 <div class="signup-link">
-                    Pas encore inscrit ? <a href="mailto:admin@gmail.fr">Écrire au gestionnaire</a>
+                    Pas encore inscrit ? <a href="/Gestion_memoire/app/views/auth/inscription.php">Créer un compte</a>
                 </div>
             </form>
             </div>
@@ -663,7 +596,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         const userTypeInput = document.getElementById('userTypeInput');
         const alertDiv = document.getElementById('alertMessage');
         const loginPanel = document.getElementById('loginPanel');
-        const registerPanel = document.getElementById('registerPanel');
         const tabButtons = document.querySelectorAll('.tab-btn');
 
         function selectUserType(btn, type) {
@@ -674,47 +606,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         function activateTab(tab) {
             tabButtons.forEach(button => button.classList.toggle('active', button.textContent.trim() === (tab === 'login' ? 'Se connecter' : 'Créer un compte')));
-            const loginLeft = document.querySelector('.login-left');
             if (tab === 'login') {
                 loginPanel.classList.remove('hidden');
-                registerPanel.classList.add('hidden');
                 alertDiv.style.display = 'none';
                 document.querySelector('.welcome-subtitle').textContent = 'Connectez-vous à votre espace personnel.';
-                // Par défaut pour l'onglet connexion, conserver le rôle étudiant
-                userTypeInput.value = 'etudiant';
-                loginLeft.classList.remove('register-active');
-            } else {
-                loginPanel.classList.add('hidden');
-                registerPanel.classList.remove('hidden');
-                alertDiv.style.display = 'none';
-                document.querySelector('.welcome-subtitle').textContent = 'Créez un compte pour accéder à la plateforme.';
-                userTypeInput.value = 'etudiant';
-                loginLeft.classList.add('register-active');
             }
-        }
-
-        document.querySelectorAll('.tab-btn').forEach(button => {
-            button.addEventListener('click', () => {
-                const tab = button.textContent.trim() === 'Créer un compte' ? 'register' : 'login';
-                activateTab(tab);
-            });
-        });
-
-        // Certains éléments (showRegisterTab / showLoginTab) peuvent ne pas exister
-        const showRegisterTabBtn = document.getElementById('showRegisterTab');
-        if (showRegisterTabBtn) {
-            showRegisterTabBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                activateTab('register');
-            });
-        }
-
-        const showLoginTabBtn = document.getElementById('showLoginTab');
-        if (showLoginTabBtn) {
-            showLoginTabBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                activateTab('login');
-            });
         }
 
         function showAlert(type, message) {
@@ -794,7 +690,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 console.error('Erreur:', error);
             });
         });
-
     </script>
 </body>
 </html>

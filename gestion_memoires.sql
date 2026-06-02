@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Hôte : localhost
--- Généré le : lun. 01 juin 2026 à 15:19
+-- Généré le : mar. 02 juin 2026 à 13:52
 -- Version du serveur : 10.4.32-MariaDB
 -- Version de PHP : 8.2.12
 
@@ -80,7 +80,7 @@ CREATE TABLE `direction_etude` (
 --
 
 INSERT INTO `direction_etude` (`idde`, `nom`, `prenom`, `email`, `motdepasse`) VALUES
-(1, 'Admin', 'Admin', 'admin@gmail.com', 'admin123');
+(1, '', '', 'admin@gmail.com', 'Admin123');
 
 -- --------------------------------------------------------
 
@@ -93,9 +93,12 @@ CREATE TABLE `etudiant` (
   `nom` varchar(100) NOT NULL,
   `prenom` varchar(100) NOT NULL,
   `idfiliere` int(11) NOT NULL,
+  `idCentre` int(11) DEFAULT NULL,
+  `idNiveau` int(11) DEFAULT NULL,
   `niveau` varchar(20) NOT NULL,
   `email` varchar(150) NOT NULL,
   `motdepasse` varchar(255) NOT NULL,
+  `type_compte` varchar(20) NOT NULL DEFAULT 'consultant',
   `date_creation` timestamp NULL DEFAULT current_timestamp()
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
@@ -103,8 +106,8 @@ CREATE TABLE `etudiant` (
 -- Déchargement des données de la table `etudiant`
 --
 
-INSERT INTO `etudiant` (`idetudiant`, `nom`, `prenom`, `idfiliere`, `niveau`, `email`, `motdepasse`, `date_creation`) VALUES
-(1, 'DANNON', 'Keneth', 2, 'Licence 2', 'nellysdannon@gmail.com', 'Keneth2006', '2026-05-29 13:02:26');
+INSERT INTO `etudiant` (`idetudiant`, `nom`, `prenom`, `idfiliere`, `idCentre`, `idNiveau`, `niveau`, `email`, `motdepasse`, `type_compte`, `date_creation`) VALUES
+(1, 'DANNON', 'Keneth', 2, NULL, NULL, 'Licence 2', 'nellysdannon@gmail.com', 'Keneth2006', 'consultant', '2026-05-29 13:02:26');
 
 -- --------------------------------------------------------
 

@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 function e($value) {
     return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
 }
@@ -256,5 +256,3 @@ function get_professeur_name_by_id($conn, $idprof) {
 function professeur_option_selected($current_name, $prenom, $nom) {
     return trim((string) $current_name) === trim($prenom . ' ' . $nom) ? 'selected' : '';
 }
-?>
-

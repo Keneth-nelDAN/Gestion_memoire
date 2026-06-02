@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 session_start();
 require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../config/mysqli_config.php';
@@ -77,7 +77,7 @@ $nb_diplomes = scalar_count($conn, "SELECT COUNT(*) FROM etudiant WHERE type_com
 $nb_professeurs = scalar_count($conn, "SELECT COUNT(*) FROM professeur");
 
 $filieres = mysqli_query($conn, "SELECT idfiliere, nom_filiere FROM filiere ORDER BY nom_filiere ASC");
-$annees = mysqli_query($conn, "SELECT DISTINCT annee_academique FROM ancien_memoire WHERE annee_academique IS NOT NULL AND annee_academique <> '' ORDER BY annee_academique DESC");
+$annees = mysqli_query($conn, "SELECT DISTINCT YEAR(date_depot) as annee_academique FROM ancien_memoire WHERE date_depot IS NOT NULL ORDER BY annee_academique DESC");
 $recent_professeurs = mysqli_query($conn, "SELECT idprof, nom, prenom, email FROM professeur ORDER BY idprof DESC LIMIT 4");
 
 $where = [];
@@ -98,9 +98,9 @@ if ($filiere_filter > 0) {
 }
 
 if ($annee_filter !== '') {
-    $where[] = "am.annee_academique = ?";
-    $params[] = $annee_filter;
-    $types .= 's';
+    $where[] = "YEAR(am.date_depot) = ?";
+    $params[] = (int) $annee_filter;
+    $types .= 'i';
 }
 
 $sql = "SELECT am.*, f.nom_filiere,
