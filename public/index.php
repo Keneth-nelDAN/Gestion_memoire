@@ -1,22 +1,25 @@
 <?php
-// Charger les fichiers requis de manière robuste à l'aide de chemins absolus
-require_once __DIR__ . "/../config/database.php";
-require_once __DIR__ . "/../app/models/dashboard.php";
-require_once __DIR__ . "/../app/models/memoire.php"; // respect de la minuscule
+// 1. Charger la configuration bdd et démarrer la connexion
+require_once "../config/database.php";
 
-// Obtenir la connexion PDO
 $database = new Database();
 $pdo = $database->connect();
 
 if (!$pdo) {
-    die("Échec d'initialisation de la base de données.");
+    die("Erreur de connexion à la base de données. Veuillez vérifier vos paramètres.");
 }
 
-// Récupérer le filtre de niveau
+// 2. Charger les modèles de données (Attention aux majuscules/minuscules !)
+require_once "../app/models/memoire.php";
+require_once "../app/models/dashboard.php";
+
+// 3. Charger les contrôleurs
+require_once "../app/controllers/dashboardController.php";
+
+// 4. Détecter le niveau choisi
 $niveau = $_GET['niveau'] ?? "Tous";
 
-// Charger et exécuter le contrôleur principal
-require_once __DIR__ . "/../app/controllers/dashboardController.php";
+// 5. Exécuter le contrôleur du Tableau de Bord (Dashboard)
 $controller = new dashboardController();
 $controller->index();
 ?>
