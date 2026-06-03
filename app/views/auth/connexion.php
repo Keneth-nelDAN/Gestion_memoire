@@ -1,80 +1,3 @@
-<?php
-require_once __DIR__ . '/../../../config/database.php';
-
-$filieres = [];
-$niveauOptions = [];
-
-try {
-    $database = new Database();
-    $db = $database->connect();
-
-    $stmt = $db->query('SELECT idfiliere, nom_filiere FROM filiere ORDER BY nom_filiere');
-    $filieres = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    $stmt = $db->query('SELECT DISTINCT niveau FROM etudiant ORDER BY niveau');
-    $niveauOptions = $stmt->fetchAll(PDO::FETCH_COLUMN);
-} catch (Exception $e) {
-    $filieres = [];
-    $niveauOptions = [];
-session_start();
-require_once __DIR__ . '/../../../config/database.php';
-
-$error = '';
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $email = strtolower(trim($_POST['email'] ?? ''));
-    $password = trim($_POST['motdepasse'] ?? '');
-    $role = $_POST['role'] ?? 'etudiant';
-
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL) || $password === '') {
-        $error = 'Veuillez saisir un email valide et un mot de passe.';
-    } elseif ($role === 'etudiant') {
-        $column = mysqli_query($conn, "SHOW COLUMNS FROM etudiant LIKE 'type_compte'");
-        if (!$column || mysqli_num_rows($column) === 0) {
-            mysqli_query($conn, "ALTER TABLE etudiant ADD type_compte varchar(20) NOT NULL DEFAULT 'consultant' AFTER motdepasse");
-        }
-        $stmt = mysqli_prepare($conn, 'SELECT idetudiant, nom, prenom, email, motdepasse, type_compte FROM etudiant WHERE email = ? LIMIT 1');
-        mysqli_stmt_bind_param($stmt, 's', $email);
-        mysqli_stmt_execute($stmt);
-        $user = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
-
-        if ($user && hash_equals((string) $user['motdepasse'], $password)) {
-            $_SESSION['idetudiant'] = (int) $user['idetudiant'];
-            $_SESSION['nom_etudiant'] = trim($user['prenom'] . ' ' . $user['nom']);
-            $_SESSION['type_compte_etudiant'] = $user['type_compte'] ?: 'consultant';
-            header('Location: ../etudiant/dashboard_etudiant.php');
-            exit;
-        }
-        $error = 'Identifiants étudiant incorrects.';
-    } elseif ($role === 'professeur') {
-        $stmt = mysqli_prepare($conn, 'SELECT idprof, nom, prenom, motdepasse FROM professeur WHERE email = ? LIMIT 1');
-        mysqli_stmt_bind_param($stmt, 's', $email);
-        mysqli_stmt_execute($stmt);
-        $user = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
-
-        if ($user && hash_equals((string) $user['motdepasse'], $password)) {
-            $_SESSION['idprof'] = (int) $user['idprof'];
-            $_SESSION['nom_professeur'] = trim($user['prenom'] . ' ' . $user['nom']);
-            header('Location: ../professeur/dashboard_professeur.php');
-            exit;
-        }
-        $error = 'Identifiants professeur incorrects.';
-    } else {
-        $stmt = mysqli_prepare($conn, 'SELECT idde, nom, prenom, motdepasse FROM direction_etude WHERE email = ? LIMIT 1');
-        mysqli_stmt_bind_param($stmt, 's', $email);
-        mysqli_stmt_execute($stmt);
-        $user = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
-
-        if ($user && hash_equals((string) $user['motdepasse'], $password)) {
-            $_SESSION['idde'] = (int) $user['idde'];
-            $_SESSION['nom_de'] = trim($user['prenom'] . ' ' . $user['nom']);
-            header('Location: ../direction_etude/dashboard_de.php');
-            exit;
-        }
-        $error = 'Identifiants Direction des Études incorrects.';
-    }
-}
-?>
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -753,7 +676,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Connexion en cours...';
             alertDiv.style.display = 'none';
 
-            fetch('/Gestion_memoire/public/login.php', {
+            fetch('../../../public/login.php', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
@@ -770,13 +693,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     setTimeout(() => {
                         switch(data.user.type) {
                             case 'etudiant':
-                                window.location.href = '/Gestion_memoire/app/views/etudiant/dashboard_etudiant.php';
+                                window.location.href = '../../../public/index.php';
                                 break;
                             case 'professeur':
-                                window.location.href = '/Gestion_memoire/app/views/professeur/dashboard_professeur.php';
+                                window.location.href = '../professeur/dashboard_professeur.php';
                                 break;
                             case 'directeur':
-                                window.location.href = '/Gestion_memoire/app/views/direction_etude/dashboard_de.php';
+                                window.location.href = '../direction_etude/dashboard_de.php';
                                 break;
                         }
                     }, 1500);

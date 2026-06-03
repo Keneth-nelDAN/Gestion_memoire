@@ -45,13 +45,12 @@ if (!isset($initiales_de)) {
         <a class="<?= $active_page === 'professeurs' ? 'active' : '' ?>" href="professeurs_de.php">
             <i class="fa-solid fa-user-plus"></i> Ajouter professeur
         </a>
+        <a class="<?= $active_page === 'logout' ? 'active' : '' ?>" href="../../../public/logout.php">
+            <i class="fa-solid fa-right-from-bracket"></i> Déconnexion
+        </a>
         <a class="<?= $active_page === 'etudiants' ? 'active' : '' ?>" href="etudiants_de.php">
             <i class="fa-solid fa-users"></i> Étudiants
         </a>
     </nav>
-
-    <a class="logout-link" href="../../../public/logout.php">
-        <i class="fa-solid fa-right-from-bracket"></i> Déconnexion
-    </a>
 </aside>
 

@@ -1,6 +1,6 @@
 <?php
 session_start();
-require_once __DIR__ . '/../../../config/database.php';
+require_once __DIR__ . '/../../../config/legacy_db.php';
 
 if (empty($_SESSION['idetudiant'])) {
     header('Location: ../auth/connexion.php');

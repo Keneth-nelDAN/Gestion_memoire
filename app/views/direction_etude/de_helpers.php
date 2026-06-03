@@ -1,4 +1,8 @@
 ﻿<?php
+if (!isset($conn)) {
+    require_once __DIR__ . '/../../../config/legacy_db.php';
+}
+
 function e($value) {
     return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
 }
@@ -48,6 +52,92 @@ function bind_params_dynamic($stmt, $types, &$params) {
     return mysqli_stmt_bind_param($stmt, $types, ...$refs);
 }
 
+function table_has_column($conn, $table, $column) {
+    $table = mysqli_real_escape_string($conn, (string) $table);
+    $column = mysqli_real_escape_string($conn, (string) $column);
+    $result = mysqli_query($conn, "SHOW COLUMNS FROM `{$table}` LIKE '{$column}'");
+    return $result && mysqli_num_rows($result) > 0;
+}
+
+function get_memoire_year_column($conn) {
+    if (table_has_column($conn, 'ancien_memoire', 'idAnnee')) {
+        return 'idAnnee';
+    }
+    if (table_has_column($conn, 'ancien_memoire', 'annee_academique')) {
+        return 'annee_academique';
+    }
+    return null;
+}
+
+function get_annee_options($conn) {
+    $yearColumn = get_memoire_year_column($conn);
+    if ($yearColumn === 'idAnnee') {
+        return mysqli_query($conn, "SELECT idAnnee, annee FROM annee_scolaire ORDER BY annee DESC");
+    }
+    if ($yearColumn === 'annee_academique') {
+        return mysqli_query($conn, "SELECT DISTINCT annee_academique FROM ancien_memoire WHERE annee_academique IS NOT NULL AND annee_academique <> '' ORDER BY annee_academique DESC");
+    }
+    return false;
+}
+
+function get_etudiant_schema($conn) {
+    return [
+        'niveau' => table_has_column($conn, 'etudiant', 'niveau'),
+        'idNiveau' => table_has_column($conn, 'etudiant', 'idNiveau'),
+        'idCentre' => table_has_column($conn, 'etudiant', 'idCentre'),
+        'idAnnee' => table_has_column($conn, 'etudiant', 'idAnnee'),
+        'type_compte' => table_has_column($conn, 'etudiant', 'type_compte'),
+    ];
+}
+
+function get_memoire_niveau_column($conn) {
+    if (table_has_column($conn, 'ancien_memoire', 'idNiveau')) {
+        return 'idNiveau';
+    }
+    if (table_has_column($conn, 'ancien_memoire', 'niveau')) {
+        return 'niveau';
+    }
+    return null;
+}
+
+function resolve_memoire_year_value($conn, $idAnnee, $rawYear) {
+    $yearColumn = get_memoire_year_column($conn);
+    if ($yearColumn === 'idAnnee') {
+        return $idAnnee > 0 ? $idAnnee : null;
+    }
+    if ($yearColumn === 'annee_academique') {
+        return trim($rawYear);
+    }
+    return null;
+}
+
+function resolve_memoire_niveau_value($conn, $idNiveau) {
+    if (table_has_column($conn, 'ancien_memoire', 'idNiveau')) {
+        return $idNiveau > 0 ? $idNiveau : null;
+    }
+    if (table_has_column($conn, 'ancien_memoire', 'niveau')) {
+        $niveau_result = mysqli_query($conn, 'SELECT nomNiveau FROM niveau WHERE idNiveau = ' . (int) $idNiveau . ' LIMIT 1');
+        $row = $niveau_result ? mysqli_fetch_assoc($niveau_result) : null;
+        return $row['nomNiveau'] ?? null;
+    }
+    return null;
+}
+
+function get_annee_by_id($conn, $idAnnee) {
+    $idAnnee = (int) $idAnnee;
+    if ($idAnnee <= 0) {
+        return null;
+    }
+    $stmt = mysqli_prepare($conn, 'SELECT annee FROM annee_scolaire WHERE idAnnee = ? LIMIT 1');
+    if (!$stmt) {
+        return null;
+    }
+    mysqli_stmt_bind_param($stmt, 'i', $idAnnee);
+    mysqli_stmt_execute($stmt);
+    $row = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
+    return $row['annee'] ?? null;
+}
+
 function get_de_centres($conn) {
     $centres = ['Agla', 'Akpakpa', 'Gbegamey', 'Calavi', 'Porto-novo'];
 
@@ -90,6 +180,10 @@ function ensure_etudiant_account_schema($conn) {
     $niveau_column = mysqli_query($conn, "SHOW COLUMNS FROM etudiant LIKE 'idNiveau'");
     if (!$niveau_column || mysqli_num_rows($niveau_column) === 0) {
         mysqli_query($conn, "ALTER TABLE etudiant ADD idNiveau int DEFAULT NULL AFTER idCentre");
+    }
+    $idAnnee_column = mysqli_query($conn, "SHOW COLUMNS FROM etudiant LIKE 'idAnnee'");
+    if (!$idAnnee_column || mysqli_num_rows($idAnnee_column) === 0) {
+        mysqli_query($conn, "ALTER TABLE etudiant ADD idAnnee int DEFAULT NULL AFTER idNiveau");
     }
 }
 

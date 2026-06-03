@@ -2,6 +2,9 @@
 require_once "../config/database.php";
 require_once "../app/models/Like.php";
 
+$database = new Database();
+$pdo = $database->connect();
+
 if(session_status() == PHP_SESSION_NONE){
     session_start();
 }

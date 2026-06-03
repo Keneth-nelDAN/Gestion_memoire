@@ -1,7 +1,10 @@
-<?php
+﻿<?php
 
 require_once "../config/database.php";
 require_once "../app/models/Publication.php";
+
+$database = new Database();
+$pdo = $database->connect();
 
 if(!isset($_GET['id']))
 {

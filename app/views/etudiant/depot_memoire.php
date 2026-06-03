@@ -1,6 +1,6 @@
 ﻿<?php
 session_start();
-require_once __DIR__ . '/../../../config/database.php';
+require_once __DIR__ . '/../../../config/legacy_db.php';
 
 if (empty($_SESSION['idetudiant'])) {
     header('Location: ../auth/connexion.php');
@@ -349,4 +349,3 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </script>
 </body>
 </html>
-

@@ -18,6 +18,8 @@ $mail_error = '';
 $filieres = mysqli_query($conn, "SELECT idfiliere, nom_filiere FROM filiere ORDER BY nom_filiere ASC");
 $centres = get_de_centres($conn);
 $niveaux = get_de_niveaux($conn);
+$annees = mysqli_query($conn, "SELECT idAnnee, annee FROM annee_scolaire ORDER BY annee DESC");
+$studentSchema = get_etudiant_schema($conn);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $nom = trim($_POST['nom'] ?? '');
@@ -26,6 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $idfiliere = (int) ($_POST['idfiliere'] ?? 0);
     $idCentre = (int) ($_POST['idCentre'] ?? 0);
     $idNiveau = (int) ($_POST['idNiveau'] ?? 0);
+    $idAnnee = (int) ($_POST['idAnnee'] ?? 0);
     $type_compte = $_POST['type_compte'] ?? 'consultant';
 
     if (!in_array($type_compte, ['consultant', 'diplome'], true)) {
@@ -46,32 +49,92 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Un étudiant utilise déjà cette adresse Gmail.';
         } else {
             $password = generate_student_password();
-            $niveau_result = mysqli_query($conn, 'SELECT nomNiveau FROM niveau WHERE idNiveau = ' . $idNiveau . ' LIMIT 1');
-            $niveau_row = $niveau_result ? mysqli_fetch_assoc($niveau_result) : null;
-            $niveau = $niveau_row['nomNiveau'] ?? '';
-            $stmt = mysqli_prepare($conn, 'INSERT INTO etudiant (nom, prenom, idfiliere, idCentre, idNiveau, niveau, email, motdepasse, type_compte) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
-            mysqli_stmt_bind_param($stmt, 'ssiiissss', $nom, $prenom, $idfiliere, $idCentre, $idNiveau, $niveau, $email, $password, $type_compte);
+            $niveau_row = null;
+            if ($idNiveau > 0) {
+                $niveau_result = mysqli_query($conn, 'SELECT nomNiveau FROM niveau WHERE idNiveau = ' . $idNiveau . ' LIMIT 1');
+                $niveau_row = $niveau_result ? mysqli_fetch_assoc($niveau_result) : null;
+            }
+            $niveau_label = $niveau_row['nomNiveau'] ?? '';
 
-            if (mysqli_stmt_execute($stmt)) {
-                $generated_password = $password;
-                $mail_sent = send_student_credentials_email($email, $prenom, $password, $type_compte, $mail_error);
-                $success = 'Compte étudiant créé avec succès.';
+            $columns = ['nom', 'prenom', 'idfiliere'];
+            $types = 'ssi';
+            $params = [$nom, $prenom, $idfiliere];
+
+            if ($studentSchema['idCentre']) {
+                $columns[] = 'idCentre';
+                $types .= 'i';
+                $params[] = $idCentre;
+            }
+
+            if ($studentSchema['idNiveau']) {
+                $columns[] = 'idNiveau';
+                $types .= 'i';
+                $params[] = $idNiveau;
+            }
+
+            if ($studentSchema['idAnnee']) {
+                $columns[] = 'idAnnee';
+                $types .= 'i';
+                $params[] = $idAnnee;
+            }
+
+            if ($studentSchema['niveau']) {
+                $columns[] = 'niveau';
+                $types .= 's';
+                $params[] = $niveau_label;
+            }
+
+            if ($studentSchema['type_compte']) {
+                $columns[] = 'type_compte';
+                $types .= 's';
+                $params[] = $type_compte;
+            }
+
+            $columns[] = 'email';
+            $types .= 's';
+            $params[] = $email;
+            $columns[] = 'motdepasse';
+            $types .= 's';
+            $params[] = $password;
+
+            $placeholders = implode(', ', array_fill(0, count($columns), '?'));
+            $stmt = mysqli_prepare($conn, 'INSERT INTO etudiant (' . implode(', ', $columns) . ') VALUES (' . $placeholders . ')');
+
+            if (!$stmt) {
+                $error = 'Erreur préparation requête : ' . mysqli_error($conn);
             } else {
-                $error = 'Impossible de créer le compte étudiant.';
+                if (!bind_params_dynamic($stmt, $types, $params)) {
+                    $error = 'Erreur liaison des paramètres étudiants.';
+                } elseif (mysqli_stmt_execute($stmt)) {
+                    $generated_password = $password;
+                    $mail_sent = send_student_credentials_email($email, $prenom, $password, $type_compte, $mail_error);
+                    $success = 'Compte étudiant créé avec succès.';
+                } else {
+                    $error = 'Impossible de créer le compte étudiant : ' . mysqli_error($conn);
+                }
             }
         }
     }
 }
 
-$students = mysqli_query($conn, "
-    SELECT e.idetudiant, e.nom, e.prenom, e.email, e.niveau, e.type_compte, e.date_creation,
-           f.nom_filiere, c.nomCentre, n.nomNiveau
-    FROM etudiant e
-    LEFT JOIN filiere f ON f.idfiliere = e.idfiliere
-    LEFT JOIN centre c ON c.idCentre = e.idCentre
-    LEFT JOIN niveau n ON n.idNiveau = e.idNiveau
-    ORDER BY e.idetudiant DESC
-");
+$student_select = "SELECT e.idetudiant, e.nom, e.prenom, e.email, e.type_compte, e.date_creation, f.nom_filiere, c.nomCentre";
+if ($studentSchema['niveau']) {
+    $student_select .= ", e.niveau";
+}
+if ($studentSchema['idNiveau']) {
+    $student_select .= ", n.nomNiveau AS niveau_id";
+}
+$student_select .= " FROM etudiant e LEFT JOIN filiere f ON f.idfiliere = e.idfiliere";
+if ($studentSchema['idCentre']) {
+    $student_select .= " LEFT JOIN centre c ON c.idCentre = e.idCentre";
+} else {
+    $student_select .= " LEFT JOIN centre c ON 1=0";
+}
+if ($studentSchema['idNiveau']) {
+    $student_select .= " LEFT JOIN niveau n ON n.idNiveau = e.idNiveau";
+}
+$student_select .= " ORDER BY e.idetudiant DESC";
+$students = mysqli_query($conn, $student_select);
 $total_students = $students ? mysqli_num_rows($students) : 0;
 $consultants = mysqli_query($conn, "SELECT COUNT(*) FROM etudiant WHERE type_compte = 'consultant'");
 $diplomes = mysqli_query($conn, "SELECT COUNT(*) FROM etudiant WHERE type_compte = 'diplome'");
@@ -155,9 +218,17 @@ $nb_diplomes = (int) (mysqli_fetch_row($diplomes)[0] ?? 0);
 
                 <label for="idNiveau">Niveau</label>
                 <select id="idNiveau" name="idNiveau" required>
-                    <option value="">SÃ©lectionner</option>
+                    <option value="">Sélectionner</option>
                     <?php if ($niveaux) { while ($niveau = mysqli_fetch_assoc($niveaux)): ?>
                         <option value="<?= (int) $niveau['idNiveau'] ?>"><?= e($niveau['nomNiveau']) ?></option>
+                    <?php endwhile; } ?>
+                </select>
+
+                <label for="idAnnee">Année</label>
+                <select id="idAnnee" name="idAnnee" required>
+                    <option value="">Sélectionner</option>
+                    <?php if ($annees) { while ($annee = mysqli_fetch_assoc($annees)): ?>
+                        <option value="<?= (int) $annee['idAnnee'] ?>"><?= e($annee['annee']) ?></option>
                     <?php endwhile; } ?>
                 </select>
 
@@ -199,7 +270,7 @@ $nb_diplomes = (int) (mysqli_fetch_row($diplomes)[0] ?? 0);
                             <div>
                                 <strong><?= e($student['prenom'] . ' ' . $student['nom']) ?></strong>
                                 <span><?= e($student['email']) ?></span>
-                                <small><?= e($student['nom_filiere'] ?: 'Filière non définie') ?> · <?= e($student['niveau']) ?></small>
+                                <small><?= e($student['nom_filiere'] ?: 'Filière non définie') ?> · <?= e($student['niveau'] ?? $student['niveau_id'] ?? 'Niveau non défini') ?></small>
                             </div>
                             <span class="badge"><?= $student['type_compte'] === 'diplome' ? 'Diplômé' : 'Consultaire' ?></span>
                         </article>

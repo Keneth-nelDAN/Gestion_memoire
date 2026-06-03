@@ -7,7 +7,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Détail de la mémoire</title>
-    <link rel="stylesheet" href="/Mon document/Gestion_memoire/public/assets/css/style.css">
+    <link rel="stylesheet" href="/Mon%20document/Gestion_memoire/public/assets/css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
 <body>
@@ -60,7 +60,7 @@
             <div class="pdf-section">
 
                 <iframe
-                    src="/Mon%20document/Gestion_memoire/public/view_pdf.php?id=<?= $memoire['idAM'] ?>#toolbar=0"
+                    src="view_pdf.php?id=<?= $memoire['idAM'] ?>#toolbar=0"
                     width="100%"
                     height="800">
                 </iframe>

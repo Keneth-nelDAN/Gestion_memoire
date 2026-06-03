@@ -129,7 +129,10 @@ class AuthController {
             $stmt->execute([':email' => $email]);
             $etudiant = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            if ($etudiant && $password === $etudiant['motdepasse']) {
+            $password = trim($password);
+            $storedPassword = trim((string) $etudiant['motdepasse']);
+            $passwordMatches = $etudiant && (password_verify($password, $storedPassword) || hash_equals($storedPassword, $password));
+            if ($passwordMatches) {
                 // Connexion réussie
                 return [
                     'success' => true,
@@ -163,7 +166,10 @@ class AuthController {
             $stmt->execute([':email' => $email]);
             $professeur = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            if ($professeur && $password === $professeur['motdepasse']) {
+            $password = trim($password);
+            $storedPassword = trim((string) $professeur['motdepasse']);
+            $passwordMatches = $professeur && (password_verify($password, $storedPassword) || hash_equals($storedPassword, $password));
+            if ($passwordMatches) {
                 // Connexion réussie
                 return [
                     'success' => true,
@@ -197,7 +203,10 @@ class AuthController {
             $stmt->execute([':email' => $email]);
             $directeur = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            if ($directeur && $password === $directeur['motdepasse']) {
+            $password = trim($password);
+            $storedPassword = trim((string) $directeur['motdepasse']);
+            $passwordMatches = $directeur && (password_verify($password, $storedPassword) || hash_equals($storedPassword, $password));
+            if ($passwordMatches) {
                 // Connexion réussie
                 return [
                     'success' => true,

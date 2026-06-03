@@ -40,7 +40,8 @@
         </form>
         <div class="menu">
             <?php if ($showActions): ?>
-            <a href="depot.php" class="btn-depot">
+            <?php $baseUrl = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\'); ?>
+            <a href="<?= $baseUrl ?>/depot_memoire.php" class="btn-depot">
                 <i class="fa-solid fa-upload"></i> Déposer un mémoire
             </a>
             <?php endif; ?>

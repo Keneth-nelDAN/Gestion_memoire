@@ -61,6 +61,8 @@ if (!$memoire) {
 
 $filieres = mysqli_query($conn, "SELECT idfiliere, nom_filiere FROM filiere ORDER BY nom_filiere ASC");
 $centres = get_de_centres($conn);
+$yearColumn = get_memoire_year_column($conn);
+$annees = get_annee_options($conn);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $nomAut = trim($_POST['nomAut'] ?? '');
@@ -68,7 +70,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $theme = trim($_POST['theme'] ?? '');
     $idfiliere = (int) ($_POST['idfiliere'] ?? 0);
     $idCentre = ($_POST['idCentre'] ?? '') !== '' ? (int) $_POST['idCentre'] : null;
-    $annee = trim($_POST['annee_academique'] ?? '');
+    $idAnnee = (int) ($_POST['idAnnee'] ?? 0);
+    $annee = resolve_memoire_year_value($conn, $idAnnee, trim($_POST['annee_academique'] ?? ''));
     $maitre = trim($_POST['maitre_memoire'] ?? '');
     $examinateur = trim($_POST['examinateur'] ?? '');
     $president = trim($_POST['president_jury'] ?? '');
@@ -84,8 +87,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $fichier = $new_file;
             }
 
-            $up = mysqli_prepare($conn, "UPDATE ancien_memoire SET nomAut = ?, prenomAut = ?, theme = ?, idfiliere = ?, idCentre = ?, annee_academique = ?, maitre_memoire = ?, examinateur = ?, president_jury = ?, fichier = ?, statut = ? WHERE idAM = ?");
-            mysqli_stmt_bind_param($up, 'sssiissssssi', $nomAut, $prenomAut, $theme, $idfiliere, $idCentre, $annee, $maitre, $examinateur, $president, $fichier, $statut, $id);
+            if ($yearColumn === 'idAnnee') {
+                $up = mysqli_prepare($conn, "UPDATE ancien_memoire SET nomAut = ?, prenomAut = ?, theme = ?, idfiliere = ?, idCentre = ?, idAnnee = ?, maitre_memoire = ?, examinateur = ?, president_jury = ?, fichier = ?, statut = ? WHERE idAM = ?");
+                mysqli_stmt_bind_param($up, 'sssiissssssi', $nomAut, $prenomAut, $theme, $idfiliere, $idCentre, $idAnnee, $maitre, $examinateur, $president, $fichier, $statut, $id);
+            } else {
+                $up = mysqli_prepare($conn, "UPDATE ancien_memoire SET nomAut = ?, prenomAut = ?, theme = ?, idfiliere = ?, idCentre = ?, annee_academique = ?, maitre_memoire = ?, examinateur = ?, president_jury = ?, fichier = ?, statut = ? WHERE idAM = ?");
+                mysqli_stmt_bind_param($up, 'sssiissssssi', $nomAut, $prenomAut, $theme, $idfiliere, $idCentre, $annee, $maitre, $examinateur, $president, $fichier, $statut, $id);
+            }
 
             if (mysqli_stmt_execute($up)) {
                 header('Location: dashboard_de.php?status=updated');
@@ -160,7 +168,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
 
             <div class="field-row">
-                <div><label>Année académique</label><input name="annee_academique" value="<?= e($memoire['annee_academique']) ?>"></div>
+                <div>
+                    <label>Année académique</label>
+                    <?php if ($yearColumn === 'idAnnee'): ?>
+                        <select name="idAnnee">
+                            <option value="">Sélectionner</option>
+                            <?php if ($annees) { mysqli_data_seek($annees, 0); while ($a = mysqli_fetch_assoc($annees)): ?>
+                                <option value="<?= (int) $a['idAnnee'] ?>" <?= (isset($memoire['idAnnee']) && (int) $memoire['idAnnee'] === (int) $a['idAnnee']) ? 'selected' : '' ?>><?= e($a['annee']) ?></option>
+                            <?php endwhile; } ?>
+                        </select>
+                    <?php else: ?>
+                        <input name="annee_academique" value="<?= e($memoire['annee_academique'] ?? '') ?>">
+                    <?php endif; ?>
+                </div>
                 <div>
                     <label>Statut</label>
                     <select name="statut">

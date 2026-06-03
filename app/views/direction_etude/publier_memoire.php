@@ -46,6 +46,10 @@ $error = '';
 
 $filieres = mysqli_query($conn, "SELECT idfiliere, nom_filiere FROM filiere ORDER BY nom_filiere ASC");
 $centres = get_de_centres($conn);
+$annees = get_annee_options($conn);
+$niveaux = get_de_niveaux($conn);
+$yearColumn = get_memoire_year_column($conn);
+$niveauColumn = get_memoire_niveau_column($conn);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $nomAut = trim($_POST['nomAut'] ?? '');
@@ -53,7 +57,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $theme = trim($_POST['theme'] ?? '');
     $idfiliere = (int) ($_POST['idfiliere'] ?? 0);
     $idCentre = ($_POST['idCentre'] ?? '') !== '' ? (int) $_POST['idCentre'] : null;
-    $annee = trim($_POST['annee_academique'] ?? '');
+    $idNiveau = (int) ($_POST['idNiveau'] ?? 0);
+    $idAnnee = (int) ($_POST['idAnnee'] ?? 0);
+    $rawYear = trim($_POST['annee_academique'] ?? '');
+    $annee = resolve_memoire_year_value($conn, $idAnnee, $rawYear);
+    $niveau_value = resolve_memoire_niveau_value($conn, $idNiveau);
     $maitre = trim($_POST['maitre_memoire'] ?? '');
     $examinateur = trim($_POST['examinateur'] ?? '');
     $president = trim($_POST['president_jury'] ?? '');
@@ -65,12 +73,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $fichier = upload_file_for_memoire($_FILES['fichier'] ?? null, $upload_dir, $error);
         if ($fichier !== false) {
-            $stmt = mysqli_prepare($conn, "INSERT INTO ancien_memoire (nomAut, prenomAut, theme, idfiliere, idCentre, annee_academique, maitre_memoire, examinateur, president_jury, fichier, statut, source, publie_par) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            mysqli_stmt_bind_param($stmt, 'sssiisssssssi', $nomAut, $prenomAut, $theme, $idfiliere, $idCentre, $annee, $maitre, $examinateur, $president, $fichier, $statut, $source, $idde);
-            if (mysqli_stmt_execute($stmt)) {
-                $success = "Le mémoire a été publié avec succès.";
+            $columns = ['nomAut', 'prenomAut', 'theme', 'idfiliere'];
+            $types = 'sssi';
+            $params = [$nomAut, $prenomAut, $theme, $idfiliere];
+
+            if ($idCentre !== null) {
+                $columns[] = 'idCentre';
+                $types .= 'i';
+                $params[] = $idCentre;
+            }
+
+            if ($niveauColumn === 'idNiveau') {
+                $columns[] = 'idNiveau';
+                $types .= 'i';
+                $params[] = $idNiveau > 0 ? $idNiveau : null;
+            } elseif ($niveauColumn === 'niveau') {
+                $columns[] = 'niveau';
+                $types .= 's';
+                $params[] = $niveau_value;
+            }
+
+            if ($yearColumn === 'idAnnee') {
+                $columns[] = 'idAnnee';
+                $types .= 'i';
+                $params[] = $annee;
+            } elseif ($yearColumn === 'annee_academique') {
+                $columns[] = 'annee_academique';
+                $types .= 's';
+                $params[] = $annee;
+            }
+
+            $columns = array_merge($columns, ['maitre_memoire', 'examinateur', 'president_jury', 'fichier', 'statut', 'source', 'publie_par']);
+            $types .= 'sssssi';
+            $params = array_merge($params, [$maitre, $examinateur, $president, $fichier, $statut, $source, $idde]);
+
+            $placeholders = implode(', ', array_fill(0, count($columns), '?'));
+            $stmt = mysqli_prepare($conn, 'INSERT INTO ancien_memoire (' . implode(', ', $columns) . ') VALUES (' . $placeholders . ')');
+            if (!$stmt) {
+                $error = "Erreur préparation requête : " . mysqli_error($conn);
             } else {
-                $error = "Insertion impossible : " . mysqli_error($conn);
+                if (!bind_params_dynamic($stmt, $types, $params)) {
+                    $error = "Erreur liaison des paramètres : " . mysqli_error($conn);
+                } elseif (mysqli_stmt_execute($stmt)) {
+                    $success = "Le mémoire a été publié avec succès.";
+                } else {
+                    $error = "Insertion impossible : " . mysqli_error($conn);
+                }
             }
         }
     }
@@ -135,15 +183,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </select>
                 </div>
             </div>
+            <?php if ($niveauColumn === 'idNiveau'): ?>
             <div class="field-row">
-                <div><label>Année académique</label><input name="annee_academique" placeholder="2025-2026"></div>
-                <div><label>Statut</label><select name="statut"><option value="publie">Publié</option><option value="en_attente">Validé non publié</option><option value="brouillon">Brouillon</option></select></div>
-            </div>
-            <label>Maître mémoire</label><input name="maitre_memoire">
+                <div>
+                    <label>Niveau</label>
+                    <select name="idNiveau" required>
+                        <option value="">Sélectionner</option>
+                        <?php if ($niveaux) { mysqli_data_seek($niveaux, 0); while ($niveau = mysqli_fetch_assoc($niveaux)): ?>
+                            <option value="<?= (int) $niveau['idNiveau'] ?>"><?= e($niveau['nomNiveau']) ?></option>
+                        <?php endwhile; } ?>
+                    </select>
+                </div>
+                            <?php if ($annees) { mysqli_data_seek($annees, 0); while ($a = mysqli_fetch_assoc($annees)): ?>
+                                <option value="<?= (int) $a['idAnnee'] ?>"><?= e($a['annee']) ?></option>
+                            <?php endwhile; } ?>
+                        </select>
+                    <?php else: ?>
+                        <input name="annee_academique" placeholder="2025-2026">
+                    <?php endif; ?>
+                </div>
+                <div>
+                    <label>Statut</label>
+                    <select name="statut">
+                        <option value="publie">Publié</option>
+                        <option value="en_attente">Validé non publié</option>
+                        <option value="brouillon">Brouillon</option>
+                    </select>
+                </div>
+                <label>Maître mémoire</label><input name="maitre_memoire">
             <label>Examinateur</label><input name="examinateur">
             <label>Président du jury</label><input name="president_jury">
             <label>Fichier</label><input type="file" name="fichier" accept="application/pdf" required>
             <button class="btn-gold full" type="submit"><i class="fa-solid fa-paper-plane"></i> Publier ce mémoire</button>
+            </div>
+            
         </form>
     </main>
 </div>

@@ -1,6 +1,7 @@
 ﻿<?php
 session_start();
 require_once __DIR__ . '/../../../config/database.php';
+require_once __DIR__ . '/../../../config/legacy_db.php';
 require_once __DIR__ . '/de_helpers.php';
 
 function scalar_count($conn, $sql) {
@@ -58,7 +59,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['dashboard_action'] ?? '') 
 
 $search = trim($_GET['q'] ?? '');
 $filiere_filter = (int) ($_GET['filiere'] ?? 0);
-$annee_filter = trim($_GET['annee'] ?? '');
+$yearColumn = get_memoire_year_column($conn);
+if ($yearColumn === 'idAnnee') {
+    $annee_filter = (int) ($_GET['annee'] ?? 0);
+} else {
+    $annee_filter = trim($_GET['annee'] ?? '');
+}
 
 $nb_memoires = scalar_count($conn, "SELECT COUNT(*) FROM ancien_memoire");
 $nb_publies = scalar_count($conn, "SELECT COUNT(*) FROM ancien_memoire WHERE statut IN ('publie','publié','publiee','publiée')");
@@ -70,7 +76,7 @@ $nb_diplomes = scalar_count($conn, "SELECT COUNT(*) FROM etudiant WHERE type_com
 $nb_professeurs = scalar_count($conn, "SELECT COUNT(*) FROM professeur");
 
 $filieres = mysqli_query($conn, "SELECT idfiliere, nom_filiere FROM filiere ORDER BY nom_filiere ASC");
-$annees = mysqli_query($conn, "SELECT DISTINCT annee_academique FROM ancien_memoire WHERE annee_academique IS NOT NULL AND annee_academique <> '' ORDER BY annee_academique DESC");
+$annees = get_annee_options($conn);
 $recent_professeurs = mysqli_query($conn, "SELECT idprof, nom, prenom, email FROM professeur ORDER BY idprof DESC LIMIT 4");
 
 $where = [];
@@ -90,10 +96,14 @@ if ($filiere_filter > 0) {
     $types .= 'i';
 }
 
-if ($annee_filter !== '') {
+if ($annee_filter !== '' && $yearColumn === 'annee_academique') {
     $where[] = "am.annee_academique = ?";
     $params[] = $annee_filter;
     $types .= 's';
+} elseif ($annee_filter > 0 && $yearColumn === 'idAnnee') {
+    $where[] = "am.idAnnee = ?";
+    $params[] = $annee_filter;
+    $types .= 'i';
 }
 
 $sql = "SELECT am.*, f.nom_filiere,
@@ -285,9 +295,17 @@ if ($stmt) {
                 </select>
                 <select name="annee">
                     <option value="">Toutes les années</option>
-                    <?php if ($annees) { while ($annee = mysqli_fetch_assoc($annees)): ?>
-                        <option value="<?= e($annee['annee_academique']) ?>" <?= $annee_filter === $annee['annee_academique'] ? 'selected' : '' ?>><?= e($annee['annee_academique']) ?></option>
-                    <?php endwhile; } ?>
+                    <?php if ($annees): ?>
+                        <?php if ($yearColumn === 'idAnnee'): ?>
+                            <?php while ($annee = mysqli_fetch_assoc($annees)): ?>
+                                <option value="<?= (int) $annee['idAnnee'] ?>" <?= $annee_filter === (int) $annee['idAnnee'] ? 'selected' : '' ?>><?= e($annee['annee']) ?></option>
+                            <?php endwhile; ?>
+                        <?php else: ?>
+                            <?php while ($annee = mysqli_fetch_assoc($annees)): ?>
+                                <option value="<?= e($annee['annee_academique']) ?>" <?= $annee_filter === $annee['annee_academique'] ? 'selected' : '' ?>><?= e($annee['annee_academique']) ?></option>
+                            <?php endwhile; ?>
+                        <?php endif; ?>
+                    <?php endif; ?>
                 </select>
                 <button class="btn-blue" type="submit"><i class="fa-solid fa-magnifying-glass"></i> Rechercher</button>
                 <a class="btn-muted" href="dashboard_de.php">Réinitialiser</a>

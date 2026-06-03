@@ -68,6 +68,8 @@ $error = '';
 
 $filieres = mysqli_query($conn, "SELECT idfiliere, nom_filiere FROM filiere ORDER BY nom_filiere ASC");
 $centres = get_de_centres($conn);
+$annees = get_annee_options($conn);
+$yearColumn = get_memoire_year_column($conn);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $mode = $_POST['mode'] ?? '';
@@ -78,7 +80,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $theme = trim($_POST['theme'] ?? '');
         $idfiliere = (int) ($_POST['idfiliere'] ?? 0);
         $idCentre = ($_POST['idCentre'] ?? '') !== '' ? (int) $_POST['idCentre'] : null;
-        $annee = trim($_POST['annee_academique'] ?? '');
+        $anneeInput = trim($_POST['annee_academique'] ?? '');
+        if ($yearColumn === 'idAnnee') {
+            $annee = 0;
+            if ($anneeInput !== '') {
+                $safeYear = mysqli_real_escape_string($conn, $anneeInput);
+                $row = mysqli_fetch_assoc(mysqli_query($conn, "SELECT idAnnee FROM annee WHERE annee = '$safeYear' LIMIT 1"));
+                $annee = $row ? (int) $row['idAnnee'] : 0;
+            }
+        } else {
+            $annee = $anneeInput;
+        }
         $maitre = trim($_POST['maitre_memoire'] ?? '');
         $examinateur = trim($_POST['examinateur'] ?? '');
         $president = trim($_POST['president_jury'] ?? '');
@@ -90,12 +102,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $fichier = upload_pdf_file($_FILES['fichier'] ?? null, $upload_dir, $error);
             if ($fichier !== false) {
-                $stmt = mysqli_prepare($conn, "INSERT INTO ancien_memoire (nomAut, prenomAut, theme, idfiliere, idCentre, annee_academique, maitre_memoire, examinateur, president_jury, fichier, statut, source, publie_par) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-                mysqli_stmt_bind_param($stmt, 'sssiisssssssi', $nomAut, $prenomAut, $theme, $idfiliere, $idCentre, $annee, $maitre, $examinateur, $president, $fichier, $statut, $source, $idde);
-                if (mysqli_stmt_execute($stmt)) {
-                    $success = "Le mémoire a été publié avec succès.";
+                $columns = ['nomAut', 'prenomAut', 'theme', 'idfiliere'];
+                $types = 'sssi';
+                $params = [$nomAut, $prenomAut, $theme, $idfiliere];
+
+                if ($idCentre !== null) {
+                    $columns[] = 'idCentre';
+                    $types .= 'i';
+                    $params[] = $idCentre;
+                }
+
+                if ($yearColumn === 'idAnnee') {
+                    $columns[] = 'idAnnee';
+                    $types .= 'i';
+                    $params[] = $annee;
                 } else {
-                    $error = "Insertion impossible : " . mysqli_error($conn);
+                    $columns[] = 'annee_academique';
+                    $types .= 's';
+                    $params[] = $annee;
+                }
+
+                $columns = array_merge($columns, ['maitre_memoire', 'examinateur', 'president_jury', 'fichier', 'statut', 'source', 'publie_par']);
+                $types .= 'sssssi';
+                $params = array_merge($params, [$maitre, $examinateur, $president, $fichier, $statut, $source, $idde]);
+                $stmt = mysqli_prepare($conn, 'INSERT INTO ancien_memoire (' . implode(', ', $columns) . ') VALUES (' . implode(', ', array_fill(0, count($columns), '?')) . ')');
+
+                if (!$stmt) {
+                    $error = "Erreur préparation requête : " . mysqli_error($conn);
+                } else {
+                    if (!bind_params_dynamic($stmt, $types, $params)) {
+                        $error = "Erreur liaison des paramètres : " . mysqli_error($conn);
+                    } elseif (mysqli_stmt_execute($stmt)) {
+                        $success = "Le mémoire a été publié avec succès.";
+                    } else {
+                        $error = "Insertion impossible : " . mysqli_error($conn);
+                    }
                 }
             }
         }
@@ -104,7 +145,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($mode === 'batch') {
         $idfiliere = (int) ($_POST['batch_idfiliere'] ?? 0);
         $idCentre = ($_POST['batch_idCentre'] ?? '') !== '' ? (int) $_POST['batch_idCentre'] : null;
-        $annee = trim($_POST['batch_annee'] ?? '');
+        $anneeInput = trim($_POST['batch_annee'] ?? '');
+        if ($yearColumn === 'idAnnee') {
+            $annee = 0;
+            if ($anneeInput !== '') {
+                $safeYear = mysqli_real_escape_string($conn, $anneeInput);
+                $row = mysqli_fetch_assoc(mysqli_query($conn, "SELECT idAnnee FROM annee WHERE annee = '$safeYear' LIMIT 1"));
+                $annee = $row ? (int) $row['idAnnee'] : 0;
+            }
+        } else {
+            $annee = $anneeInput;
+        }
         $maitre = trim($_POST['batch_maitre'] ?? '');
         $examinateur = trim($_POST['batch_examinateur'] ?? '');
         $president = trim($_POST['batch_president'] ?? '');
@@ -141,9 +192,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $statut = 'publie';
                 $source = 'de_lot';
 
-                $stmt = mysqli_prepare($conn, "INSERT INTO ancien_memoire (nomAut, prenomAut, theme, idfiliere, idCentre, annee_academique, maitre_memoire, examinateur, president_jury, fichier, statut, source, publie_par) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-                mysqli_stmt_bind_param($stmt, 'sssiisssssssi', $author['nom'], $author['prenom'], $theme, $idfiliere, $idCentre, $annee, $maitre, $examinateur, $president, $fichier, $statut, $source, $idde);
-                if (mysqli_stmt_execute($stmt)) {
+                $columns = ['nomAut', 'prenomAut', 'theme', 'idfiliere'];
+                $types = 'sssi';
+                $params = [$author['nom'], $author['prenom'], $theme, $idfiliere];
+                if ($idCentre !== null) {
+                    $columns[] = 'idCentre';
+                    $types .= 'i';
+                    $params[] = $idCentre;
+                }
+                if ($yearColumn === 'idAnnee') {
+                    $columns[] = 'idAnnee';
+                    $types .= 'i';
+                    $params[] = $annee;
+                } else {
+                    $columns[] = 'annee_academique';
+                    $types .= 's';
+                    $params[] = $annee;
+                }
+                $columns = array_merge($columns, ['maitre_memoire', 'examinateur', 'president_jury', 'fichier', 'statut', 'source', 'publie_par']);
+                $types .= 'sssssi';
+                $params = array_merge($params, [$maitre, $examinateur, $president, $fichier, $statut, $source, $idde]);
+                $stmt = mysqli_prepare($conn, 'INSERT INTO ancien_memoire (' . implode(', ', $columns) . ') VALUES (' . implode(', ', array_fill(0, count($columns), '?')) . ')');
+                if ($stmt && bind_params_dynamic($stmt, $types, $params) && mysqli_stmt_execute($stmt)) {
                     $inserted++;
                 }
             }

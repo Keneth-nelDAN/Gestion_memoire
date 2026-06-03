@@ -3,6 +3,9 @@
 require_once "../config/database.php";
 require_once "../app/models/Commentaire.php";
 
+$database = new Database();
+$pdo = $database->connect();
+
 session_start();
 
 $idAM = $_POST['idAM'];

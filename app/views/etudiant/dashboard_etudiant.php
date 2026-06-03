@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once __DIR__ . '/../../../config/database.php';
+require_once __DIR__ . '/../../../config/legacy_db.php';
 
 if (empty($_SESSION['idetudiant'])) {
     header('Location: ../auth/connexion.php');
@@ -60,7 +61,8 @@ $nb_deposes = (int) (mysqli_fetch_row(mysqli_stmt_get_result($deposes))[0] ?? 0)
     <section class="quick-actions">
         <a href="consulter_memoire.php"><i class="fa-solid fa-book-open-reader"></i><span>Consulter les mémoires</span></a>
         <?php if ($can_deposit): ?>
-            <a href="depot_memoire.php"><i class="fa-solid fa-file-circle-plus"></i><span>Déposer mon mémoire</span></a>
+            <?php $baseUrl = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\'); ?>
+            <a href="<?= $baseUrl ?>/depot_memoire.php"><i class="fa-solid fa-file-circle-plus"></i><span>Déposer mon mémoire</span></a>
         <?php endif; ?>
     </section>
 </main>
