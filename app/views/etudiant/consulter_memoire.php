@@ -79,6 +79,10 @@ $memoires = mysqli_stmt_get_result($stmt);
                             <p><i class="fa-solid fa-heart"></i> <?= (int) $memoire['likes'] ?> likes</p>
                             <p><i class="fa-solid fa-lock"></i> Consultation uniquement sur la plateforme</p>
                         </div>
+                        <!-- Ouvre le lecteur sécurisé contenant PDF.js et la protection par canvas dans un nouvel onglet sans exposer le PDF -->
+                        <a style="background-color: #101d29; color: white; padding: 10px 20px; text-decoration: none; border-radius: 10px; width: 400px; text-align: center;" href="view_pdf.php?id=<?= $memoire['id'] ?>" target="_blank" class="btn-lecture-protegee">
+                            Consulter <!--en Lecture Sécurisée (Anti-tél.) 🛡️-->
+                        </a>
                     </article>
                 <?php endwhile; ?>
             <?php else: ?>
