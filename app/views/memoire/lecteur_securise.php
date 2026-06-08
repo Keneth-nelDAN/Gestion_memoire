@@ -1,159 +1,154 @@
 <?php
-// app/views/memoire/lecteur_securise.php
-session_start();
-require_once "../../config/database.php";
-require_once "../../app/models/publication.php";
 
-$database = new Database();
-$pdo = $database->connect();
+// Permet de lire nativement le PDF en respectant le routing du dossier memoire/
+require __DIR__ . '/../../../views/memoire/view_pdf.php';
 
-$idAM = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-$pubModel = new Publication($pdo);
-$memoire = $pubModel->getById($idAM);
+// Vue lecteur_securise.php - à appeler par le contrôleur de votre MVC
+// L'ID est disponible via $_GET['id'] ou passé par le contrôleur
+$memoire_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
+$filePath = "";
+$themeMemo = "Thèse d'Étude GASA";
 
-if (!$memoire) {
-    die("Ce mémoire n'existe pas ou n'est plus public.");
+if ($memoire_id > 0 && isset($conn)) {
+    $query = "SELECT theme, fichier, chemin_pdf, document, chemin FROM l_ancien_memoire WHERE idAM = ?";
+    $stmt = mysqli_prepare($conn, $query);
+    if ($stmt) {
+        mysqli_stmt_bind_param($stmt, "i", $memoire_id);
+        mysqli_stmt_execute($stmt);
+        $result = mysqli_stmt_get_result($stmt);
+        if ($row = mysqli_fetch_assoc($result)) {
+            $themeMemo = $row['theme'] ?? $themeMemo;
+            $filePath = $row['fichier'] ?? $row['chemin_pdf'] ?? $row['document'] ?? $row['chemin'] ?? '';
+        }
+        mysqli_stmt_close($stmt);
+    }
+}
+
+if (empty($filePath)) {
+    $filePath = "uploads/exemples/sample_thesis.pdf"; 
+}
+
+// Données d'audit filigrane
+$student_name = $_SESSION['user_name'] ?? $_SESSION['nom'] ?? 'Candidat';
+$client_ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+$current_time = date('d/m/Y H:i');
+$watermark_text = "UATM GASA • $student_name ($client_ip) • $current_time • NON REPRODUCIBLE";
+
+$fileData = "";
+$searchPaths = [
+    $filePath,
+    __DIR__ . '/' . $filePath,
+    __DIR__ . '/../../../../' . $filePath,
+    __DIR__ . '/../../../' . $filePath,
+    "uploads/exemples/sample_thesis.pdf",
+];
+
+foreach ($searchPaths as $path) {
+    if (!empty($path) && file_exists($path) && is_file($path)) {
+        $fileData = base64_encode(file_get_contents($path));
+        break;
+    }
 }
 ?>
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Visualiseur Sécurisé - <?= htmlspecialchars($memoire['theme']) ?></title>
-    <!-- Tailwind CSS pour un design ultra moderne -->
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <!-- Librairie Mozilla PDF.js officielle chargée via CDN -->
+    <title>Lecteur Universitaire Sécurisé GASA-Shield</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
     <style>
-        /* Anti-sélection de texte pour contrer la copie de paragraphes complets */
         body {
             -webkit-user-select: none;
             -moz-user-select: none;
-            -ms-user-select: none;
             user-select: none;
         }
-        canvas {
-            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
-            margin-bottom: 2rem;
-            max-width: 100%;
-        }
-        /* Cache la frame d'impression de page habituelle du navigateur */
         @media print {
-            body { display: none; }
+            body, html, canvas, #pdf-pages-container {
+                display: none !important;
+            }
         }
     </style>
 </head>
-<body class="bg-gray-900 min-h-screen flex flex-col antialiased select-none" oncontextmenu="return false;">
-
-    <!-- Barre d'outils de visualisation sécurisée -->
-    <header class="bg-gray-800 text-white px-6 py-4 flex items-center justify-between border-b border-gray-700 shadow-lg sticky top-0 z-50">
+<body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col justify-between">
+    <header class="bg-gray-800 border-b border-gray-700 px-6 py-4 flex items-center justify-between">
         <div class="flex items-center space-x-3">
-            <span class="text-blue-400 font-extrabold text-lg">GASA Archive Secured</span>
-            <div class="h-4 w-px bg-gray-600"></div>
-            <span class="text-xs text-gray-400 truncate max-w-sm md:max-w-md font-mono"><?= htmlspecialchars($memoire['theme']) ?></span>
+            <span class="bg-indigo-600 text-white font-bold text-xs px-2.5 py-1 rounded">GASA-SHIELD ACTIVE</span>
+            <p class="text-xs text-indigo-300 font-extrabold truncate" style="max-width: 400px;"><?= htmlspecialchars($themeMemo, ENT_QUOTES, 'UTF-8') ?></p>
         </div>
-
-        <div class="flex items-center space-x-4">
-            <span class="text-xs text-red-400 bg-red-950 px-2 py-1 rounded border border-red-800 font-bold">MODE CONSULTATION SEULE (Téléchargement désactivé)</span>
-            <a href="index.php" class="bg-gray-700 hover:bg-gray-600 font-semibold text-xs px-3.5 py-1.5 rounded transition">Retour</a>
-        </div>
+        <button onclick="window.close();" class="bg-gray-700 hover:bg-red-600 text-slate-100 font-bold px-4 py-1 rounded transition text-xs">Fermer</button>
     </header>
 
-    <!-- Zone principale contenant le visualiseur -->
-    <main class="flex-grow flex flex-col items-center justify-start p-4 md:p-8 overflow-y-auto">
-        <div id="loading" class="text-gray-400 text-center py-20">
-            <svg class="animate-spin h-10 w-10 text-blue-500 mx-auto mb-4" viewBox="0 0 24 24" fill="none">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <p class="font-medium">Chargement sécurisé du document en cours de traitement...</p>
-        </div>
+    <div id="security-warning" class="hidden bg-red-600 text-white px-6 py-2.5 text-center text-xs font-bold">
+        ⚠️ Action sécurisée bloquée : Captures de texte, impressions et téléchargements du document original sont contrôlés et bloqués.
+    </div>
 
-        <!-- Conteneur global recevant les Canvas injectés par PDF.js -->
-        <div id="pdf-container" class="w-full max-w-4xl hidden flex flex-col items-center"></div>
+    <main class="flex-1 overflow-y-auto p-4 flex flex-col items-center bg-gray-950">
+        <div id="pdf-pages-container" class="flex flex-col items-center space-y-4">
+            <div id="loading" class="text-indigo-400 py-12 flex flex-col items-center space-y-2">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div>
+                <p class="text-xs font-bold">Moteur vectoriel sécurisé en cours de rendu...</p>
+            </div>
+        </div>
     </main>
 
     <script>
-        // Charger la ressource PDF.js globale
-        const pdfjsLib = window['pdfjs-dist/build/pdf'];
-        
-        // Spécification de l'URL du Worker PDF.js
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+        const base64Data = '<?= $fileData ?>';
 
-        // L'URL masque pointant vers le proxy stream qui diffuse le document
-        const documentUrl = '../../../public/visualiser_pdf.php?id=<?= $memoire['idAM'] ?>';
-        const pdfContainer = document.getElementById('pdf-container');
-        const loadingIndicator = document.getElementById('loading');
-
-        // Charger asynchroniquement le PDF
-        pdfjsLib.getDocument(documentUrl).promise.then(pdf => {
-            // Effacer l'indicateur de chargement
-            loadingIndicator.classList.add('hidden');
-            pdfContainer.classList.remove('hidden');
-
-            // Rendu en cascade de toutes les pages sur des Canvas séparés
-            for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-                renderPdfPage(pdf, pageNum);
+        if (base64Data.trim() === '') {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('pdf-pages-container').innerHTML = `<p class="text-rose-400 font-bold py-10">Fichier de thèse introuvable sur le serveur.</p>`;
+        } else {
+            const raw = window.atob(base64Data);
+            const array = new Uint8Array(new ArrayBuffer(raw.length));
+            for(let i = 0; i < raw.length; i++) {
+                array[i] = raw.charCodeAt(i);
             }
-        }).catch(err => {
-            console.error(err);
-            loadingIndicator.innerHTML = `
-                <div class="text-red-500">
-                    <svg class="h-12 w-12 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                    <p class="font-bold">Impossible d'afficher le document.</p>
-                    <p class="text-sm text-gray-500 mt-1">${err.message}</p>
-                </div>
-            `;
-        });
 
-        // Fonction maîtresse de génération de Canvas par page
-        function renderPdfPage(pdf, pageNumber) {
-            pdf.getPage(pageNumber).then(page => {
-                const scale = 1.5; // Qualité de zoom HD
-                const viewport = page.getViewport({ scale: scale });
+            pdfjsLib.getDocument({ data: array }).promise.then(function(pdf) {
+                document.getElementById('loading').style.display = 'none';
+                for (let num = 1; num <= pdf.numPages; num++) {
+                    pdf.getPage(num).then(function(page) {
+                        const wrapper = document.createElement('div');
+                        wrapper.className = 'relative bg-white shadow-xl rounded overflow-hidden my-3';
+                        wrapper.style.width = '750px';
 
-                // Création dynamique d'un Canvas HTML5 dédié à la page
-                const canvas = document.createElement('canvas');
-                const context = canvas.getContext('2d');
-                canvas.height = viewport.height;
-                canvas.width = viewport.width;
+                        const canvas = document.createElement('canvas');
+                        wrapper.appendChild(canvas);
 
-                pdfContainer.appendChild(canvas);
+                        // Filigrane de traçabilité contre les captures photo externes
+                        const label = document.createElement('div');
+                        label.className = 'absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden';
+                        label.innerHTML = `
+                            <div style="transform: rotate(-30deg); font-size: 16px; font-weight: 800; color: rgba(99, 102, 241, 0.08); text-align: center;">
+                                <?= $watermark_text ?><br>COPIE INTERDITE / UATM GASA
+                            </div>`;
+                        wrapper.appendChild(label);
+                        document.getElementById('pdf-pages-container').appendChild(wrapper);
 
-                const renderContext = {
-                    canvasContext: context,
-                    viewport: viewport
-                };
-                page.render(renderContext);
+                        const context = canvas.getContext('2d');
+                        const viewport = page.getViewport({ scale: 1.2 });
+                        canvas.height = viewport.height;
+                        canvas.width = viewport.width;
+
+                        page.render({ canvasContext: context, viewport: viewport });
+                    });
+                }
             });
         }
 
-        // --- SCRIPTS DE PROTECTION SUPPLÉMENTAIRES ---
-
-        // 1. Bloquer le Clic-Droit pour stopper l'option "Enregistrer l'image sous" du canvas
-        document.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-        });
-
-        // 2. Bloquer les touches clavier critiques (Impression, Sauvegarde, Capture, inspecteur)
-        document.addEventListener('keydown', (e) => {
-            // Empêche Ctrl + S (Sauvegarder)
-            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-                e.preventDefault();
-                alert("Sauvegarde locale désactivée pour la protection des droits du mémoire.");
-            }
-            // Empêche Ctrl + P (Imprimer)
-            if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
-                e.preventDefault();
-                alert("Option d'impression désactivée.");
-            }
-            // Empêche l'ouverture des Outils de Développement (F12 ou Ctrl+Maj+I)
-            if (e.key === 'F12' || ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'I')) {
-                e.preventDefault();
+        // Bloquer clic droit et F12
+        document.addEventListener('contextmenu', e => { e.preventDefault(); triggerAlert(); });
+        document.addEventListener('keydown', e => {
+            if ((e.ctrlKey && ['p','s','c'].includes(e.key.toLowerCase())) || (e.metaKey && ['p','s','c'].includes(e.key.toLowerCase())) || e.key === 'F12') {
+                e.preventDefault(); triggerAlert();
             }
         });
+        function triggerAlert() {
+            document.getElementById('security-warning').classList.remove('hidden');
+            setTimeout(() => document.getElementById('security-warning').classList.add('hidden'), 5000);
+        }
     </script>
 </body>
 </html>

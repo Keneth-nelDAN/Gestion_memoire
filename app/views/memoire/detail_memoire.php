@@ -1,4 +1,9 @@
 <?php
+
+// Utilise directement la structure de detail.php pour une uniformité de conception
+require __DIR__ . '/detail.php';
+
+require_once __DIR__ . '/detail.php';
 // detail_memoire.php (Chemin d'accès : app/views/memoire/detail_memoire.php)
 session_start();
 

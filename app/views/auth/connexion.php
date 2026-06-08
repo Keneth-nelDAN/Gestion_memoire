@@ -555,8 +555,7 @@ try {
             <input type="hidden" id="userTypeInput" name="userType" value="etudiant">
 
             <div id="loginPanel">
-                <div class="form-title">Bienvenue</div>
-                <p class="subtext">Connectez-vous à votre espace personnel.</p>
+                
                 <form id="loginForm" method="POST" action="/Gestion_memoire/public/login.php">
                 <div class="form-group">
                     <label for="email">Adresse Email</label>
