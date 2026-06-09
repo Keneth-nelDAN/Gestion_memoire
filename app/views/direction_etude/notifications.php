@@ -52,7 +52,7 @@ $unread_count = (int) ($unread_row[0] ?? 0);
 </head>
 <body>
 <div class="app-container">
-    <?php include __DIR__ . '/sidebar.php'; ?>
+    <?php include __DIR__ . '/../partials/sidebar.php'; ?>
 
     <main class="workspace">
         <header class="workspace-header">

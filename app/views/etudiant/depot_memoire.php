@@ -57,7 +57,7 @@ if (!$student || (($student['type_compte'] ?? 'consultant') !== 'diplome')) {
 
 $success = '';
 $error = '';
-$upload_dir = __DIR__ . '/../direction_etude/uploads/memoires';
+$upload_dir = __DIR__ . '/../direction_etude/uploads/memoires/';
 $filieres = mysqli_query($conn, "SELECT idfiliere, nom_filiere FROM filiere ORDER BY nom_filiere ASC");
 $centres = mysqli_query($conn, "SELECT idCentre, nomCentre FROM centre ORDER BY FIELD(nomCentre, 'Agla', 'Akpakpa', 'Gbegamey', 'Calavi', 'Porto-novo'), nomCentre");
 $professeurs_result = mysqli_query($conn, "SELECT idprof, nom, prenom, email FROM professeur ORDER BY prenom ASC, nom ASC");

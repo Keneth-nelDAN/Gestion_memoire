@@ -138,7 +138,7 @@ if ($stmt) {
 </head>
 <body>
 <div class="app-container">
-    <?php include __DIR__ . '/sidebar.php'; ?>
+    <?php include __DIR__ . '/../partials/sidebar.php'; ?>
 
     <main class="workspace">
         <header class="workspace-header">
@@ -203,15 +203,17 @@ if ($stmt) {
                 <small>Comptes enseignants créés</small>
             </article>
         </section>
-
+            <hr style="border: none; border-top: 3px solid #333; width: 50%;">
+            <br/>
         <section class="quick-actions">
             <a href="publier_memoire.php"><i class="fa-solid fa-file-circle-plus"></i><span>Publier un mémoire</span></a>
             <a href="publier_lots.php"><i class="fa-solid fa-cloud-arrow-up"></i><span>Uploader plusieurs fichiers</span></a>
             <a href="etudiants_de.php"><i class="fa-solid fa-users"></i><span>Créer un compte étudiant</span></a>
             <a href="#ajouter-professeur"><i class="fa-solid fa-user-tie"></i><span>Ajouter professeur</span></a>
         </section>
-
-        <section class="dashboard-professor-panel" id="ajouter-professeur">
+            <hr style="border: none; border-top: 3px solid #333; width: 50%;">
+            <br/>
+        <!-- <section class="dashboard-professor-panel" id="ajouter-professeur">
             <article class="form-card dashboard-professor-form">
                 <div class="section-heading">
                     <div>
@@ -271,7 +273,7 @@ if ($stmt) {
                     <?php endif; ?>
                 </div>
             </article>
-        </section>
+        </section> -->
 
         <section class="table-container" id="publications">
             <div class="table-header">

@@ -13,8 +13,7 @@ if ($idAM <= 0) {
     die("Identifiant de mémoire non spécifié ou invalide.");
 }
 
-// Récupération dynamique du nom de fichier dans la BD
-$filePath = "";
+// Récupération dynamique des méta-données dans la BD
 $theme = "Mémoire Académique";
 $auteur = "UATM GASA student";
 
@@ -30,37 +29,10 @@ if ($stmt) {
     if ($row = mysqli_fetch_assoc($result)) {
         $theme = $row['theme'];
         $auteur = $row['auteur'];
-        
-        // Auto-détection de la colonne contenant le fichier
-        foreach (['fichier', 'fichier_pdf', 'chemin', 'pdf', 'url_pdf', 'document'] as $col) {
-            if (!empty($row[$col])) {
-                $fileDBName = $row[$col];
-                break;
-            }
-        }
     }
 }
 
-// Traitement sécurisé du chemin du PDF
-if (!empty($fileDBName)) {
-    if (strpos($fileDBName, '/') !== false) {
-        $filePath = $fileDBName;
-    } else {
-        // Dossier standard
-        $filePath = "uploads/exemples/" . $fileDBName;
-        if (!file_exists(__DIR__ . '/../../../' . $filePath)) {
-            $filePath = "uploads/" . $fileDBName;
-        }
-    }
-}
-
-// Fallback pour la démo ou si le PDF physique n'a pas encore été téléversé
-if (empty($filePath) || !file_exists(__DIR__ . '/../../../' . $filePath)) {
-    // Si le document est stocké au même endroit, charger un fichier générique
-    $filePath = "uploads/exemples/sample_thesis.pdf";
-}
-
-// URL relative du point de sortie brute sécurisée
+// Point de sortie brute sécurisée
 $pdfUrl = "get_secure_stream.php?id=" . $idAM;
 ?>
 <!DOCTYPE html>
@@ -131,7 +103,7 @@ $pdfUrl = "get_secure_stream.php?id=" . $idAM;
                 canvas.id = 'canvas-page-' + pageNum;
                 pageWrapper.appendChild(canvas);
 
-                // Filigrane de sécurité diagonal
+                // Filigrane diagonal
                 const watermark = document.createElement('div');
                 watermark.className = 'absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden z-10';
                 watermark.innerHTML = `
@@ -171,23 +143,20 @@ $pdfUrl = "get_secure_stream.php?id=" . $idAM;
         }).catch(function(error) {
             console.error(error);
             document.getElementById('loading').innerHTML = `
-                <div class="p-6 bg-rose-500/10 rounded-2xl border border-rose-500/30 max-w-md">
-                    <i class="fa-solid fa-cloud-bolt text-rose-550 text-2xl mb-2"></i>
-                    <p class="text-sm font-bold text-rose-450">Fichier de soutenance actuellement en cours de signature ou introuvable.</p>
+                <div class="p-6 bg-rose-500/10 rounded-2xl border border-rose-500/30 max-w-md text-center">
+                    <i class="fa-solid fa-cloud-bolt text-rose-500 text-2xl mb-2"></i>
+                    <p class="text-sm font-bold text-rose-400">Le document de soutenance n'a pas pu être chargé ou est absent du dossier.</p>
                 </div>
             `;
         });
 
-        // 🛡️ ENTRAVES TECHNIQUES ANTIVOL / ANTI-DOWNLOAD 🛡️
-
-        // 1. Désactiver le clic droit
+        // 🛡️ ENTRAVES TECHNIQUES ANTIVOL
         document.addEventListener('contextmenu', e => e.preventDefault());
 
-        // 2. Bloquer les tentatives d'impression et de sauvegarde (Ctrl+S, Ctrl+P, F12)
         document.addEventListener('keydown', function(e) {
             if (e.ctrlKey && (e.key === 'p' || e.key === 'P')) {
                 e.preventDefault();
-                alert("L'impression de ce mémoire est bloquée à des fins de protection intellectuelle.");
+                alert("L'impression de ce mémoire est désactivée.");
             }
             if (e.ctrlKey && (e.key === 's' || e.key === 'S')) {
                 e.preventDefault();

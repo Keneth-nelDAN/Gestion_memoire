@@ -69,7 +69,7 @@ $de_profile = get_de_profile($conn);
 $nom_de = $de_profile['nom_de'];
 $initiales_de = $de_profile['initiales_de'];
 $idde = isset($_SESSION['idde']) ? (int) $_SESSION['idde'] : null;
-$upload_dir = __DIR__ . '/uploads/memoires';
+$upload_dir = __DIR__ . 'Gestion_memoire/public/assets/uploads/memoires';
 $success = '';
 $error = '';
 
@@ -175,7 +175,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 <body>
 <div class="app-container">
-    <?php include __DIR__ . '/sidebar.php'; ?>
+    <?php include __DIR__ . '/../partials/sidebar.php'; ?>
 
     <main class="workspace">
         <header class="workspace-header">

@@ -1,24 +1,73 @@
 <?php
-// Initialisation de la session pour récupérer les informations de l'utilisateur
+// Initialisation de la session pour récupérer les informations réelles de l'utilisateur
 session_start();
 
-// Simulation de données de session si elles n'existent pas (pour le test visuel)
-if (!isset($_SESSION['nom'])) {
-    $_SESSION['nom'] = "Kokou";
-    $_SESSION['prenom'] = "Jean";
-    $_SESSION['email'] = "jean.kokou@universite.bj";
+// 1. Validation de l'authentification : si aucun utilisateur n'est connecté, redirection immédiate
+if (
+    empty($_SESSION['idetudiant']) && 
+    empty($_SESSION['idde']) && 
+    empty($_SESSION['id_user']) && 
+    empty($_SESSION['idprofesseur'])
+) {
+    header("Location: /Gestion_memoire/public/login.php");
+    exit;
 }
 
-// Extraction des données de session
-$nom_complet = htmlspecialchars($_SESSION['prenom'] . ' ' . $_SESSION['nom']);
-$email = htmlspecialchars($_SESSION['email']);
+// 2. Extraction dynamique et ultra-robuste des données de l'utilisateur connecté
+$nom = $_SESSION['nom'] ?? '';
+$prenom = $_SESSION['prenom'] ?? '';
+$email = $_SESSION['email'] ?? '';
 
-// Génération des initiales (Ex: Jean Kokou -> JK)
-$initiales = strtoupper(substr($_SESSION['prenom'], 0, 1) . substr($_SESSION['nom'], 0, 1));
+// Fallback pour le Directeur des Études au cas où les clés de session diffèrent
+if (empty($nom) && !empty($_SESSION['nom_de'])) {
+    $nom = $_SESSION['nom_de'];
+}
+if (empty($prenom) && !empty($_SESSION['prenom_de'])) {
+    $prenom = $_SESSION['prenom_de'];
+}
 
-// Traitement de l'action de déconnexion effective
+// S'il n'y a pas d'adresse e-mail dans la session, utiliser un fallback neutre
+if (empty($email)) {
+    $email = "utilisateur@uatm-gasa.bj";
+}
+
+$nom_complet = trim($prenom . ' ' . $nom);
+if (empty($nom_complet)) {
+    $nom_complet = "$prenom$nom";
+}
+
+$nom_complet_html = htmlspecialchars($nom_complet, ENT_QUOTES, 'UTF-8');
+$email_html = htmlspecialchars($email, ENT_QUOTES, 'UTF-8');
+
+// Génération intelligente des initiales (Ex: Jean Kokou -> JK)
+$initiales = "";
+if (!empty($prenom)) {
+    $initiales .= strtoupper(substr($prenom, 0, 1));
+}
+if (!empty($nom)) {
+    $initiales .= strtoupper(substr($nom, 0, 1));
+}
+if (empty($initiales)) {
+    $initiales = "U";
+}
+
+// 3. Détermination du tableau de bord de retour pour le bouton "Annuler"
+$cancelUrl = "/Gestion_memoire/public/login.php"; // Valeur par défaut de secours
+
+if (isset($_SESSION['idetudiant']) || (isset($_SESSION['userType']) && $_SESSION['userType'] === 'etudiant')) {
+    $cancelUrl = '/Gestion_memoire/app/views/etudiant/dashboard_etudiant.php';
+} elseif (isset($_SESSION['idde']) || (isset($_SESSION['userType']) && $_SESSION['userType'] === 'directeur')) {
+    $cancelUrl = '/Gestion_memoire/app/views/direction_etude/dashboard_de.php';
+} elseif (isset($_SESSION['id_user']) || isset($_SESSION['idprofesseur']) || (isset($_SESSION['userType']) && $_SESSION['userType'] === 'professeur')) {
+    $cancelUrl = '/Gestion_memoire/app/views/professeur/dashboard_professeur.php';
+} elseif (!empty($_SERVER['HTTP_REFERER'])) {
+    // Si on a l'URL d'origine dans le Referer, on l'utilise en fallback
+    $cancelUrl = $_SERVER['HTTP_REFERER'];
+}
+
+// 4. Traitement de la déconnexion effective
 if (isset($_POST['action']) && $_POST['action'] === 'confirm_logout') {
-    // Nettoyage complet de la session
+    // Nettoyage complet du tableau de session
     $_SESSION = [];
 
     // Destruction du cookie de session si activé
@@ -35,11 +84,11 @@ if (isset($_POST['action']) && $_POST['action'] === 'confirm_logout') {
         );
     }
 
-    // Destruction de la session
+    // Destruction finale de la session côté serveur
     session_destroy();
 
-    // Redirection vers la page de connexion
-    header("Location: login.php");
+    // Redirection stricte et propre vers le point d'entrée de connexion
+    header("Location: connexion.php");
     exit;
 }
 ?>
@@ -48,7 +97,7 @@ if (isset($_POST['action']) && $_POST['action'] === 'confirm_logout') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Déconnexion - MémoiresUniv</title>
+    <title>Déconnexion - GénieMémoire</title>
     <style>
         /* --- Variables globales et Reset --- */
         :root {
@@ -81,7 +130,7 @@ if (isset($_POST['action']) && $_POST['action'] === 'confirm_logout') {
         /* --- Barre supérieure (Header) --- */
         .navbar {
             background-color: var(--white);
-            height: 70px;
+            height: 90px;
             padding: 0 40px;
             display: flex;
             justify-content: space-between;
@@ -100,7 +149,7 @@ if (isset($_POST['action']) && $_POST['action'] === 'confirm_logout') {
         }
 
         .logo span {
-            color: #2563eb; /* Couleur d'accent optionnelle pour "Univ" */
+            color: #2563eb;
         }
 
         .user-nav-profile {
@@ -121,7 +170,7 @@ if (isset($_POST['action']) && $_POST['action'] === 'confirm_logout') {
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 100px 20px 40px 20px; /* Top padding pour éviter la navbar fixe */
+            padding: 100px 20px 40px 20px;
         }
 
         /* --- Carte Centrale --- */
@@ -135,11 +184,10 @@ if (isset($_POST['action']) && $_POST['action'] === 'confirm_logout') {
             text-align: center;
         }
 
-        /* Cercle de l'icône */
         .icon-container {
             width: 64px;
             height: 64px;
-            background-color: #fee2e2; /* Rose / rouge très clair */
+            background-color: #fee2e2;
             border-radius: 50%;
             display: flex;
             justify-content: center;
@@ -147,7 +195,6 @@ if (isset($_POST['action']) && $_POST['action'] === 'confirm_logout') {
             margin: 0 auto 24px auto;
         }
 
-        /* Icône Porte minimaliste en SVG */
         .icon-door {
             width: 28px;
             height: 28px;
@@ -169,7 +216,7 @@ if (isset($_POST['action']) && $_POST['action'] === 'confirm_logout') {
             padding: 0 10px;
         }
 
-        /* --- Bloc Utilisateur (Détails) --- */
+        /* --- Bloc Utilisateur --- */
         .user-details-box {
             background-color: var(--bg-user-block);
             border: 1px solid var(--border-color);
@@ -182,12 +229,11 @@ if (isset($_POST['action']) && $_POST['action'] === 'confirm_logout') {
             margin-bottom: 28px;
         }
 
-        /* Avatar Global (Header et Carte) */
         .avatar {
             width: 44px;
             height: 44px;
-            background-color: #e0f2fe; /* Bleu clair */
-            color: #0284c7; /* Bleu foncé */
+            background-color: #e0f2fe;
+            color: #0284c7;
             border-radius: 50%;
             display: flex;
             justify-content: center;
@@ -220,6 +266,32 @@ if (isset($_POST['action']) && $_POST['action'] === 'confirm_logout') {
             display: flex;
             flex-direction: column;
             gap: 12px;
+        }
+
+        .brand-icon {
+            width: 50px;
+            height: 50px;
+            background-color: #d4af37;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            margin: 50px auto auto auto;
+            padding: 4px 0 0 8px;
+            font-weight: bold;
+            color: #1a3a52;
+        }
+
+        .brand {
+            text-align: center;
+            margin-top: 8px;
+        }
+
+        .brand-icon,.brand {
+            color: #1a3a52;
+            display: inline-block;
+            margin: 0;
         }
 
         .btn {
@@ -256,13 +328,12 @@ if (isset($_POST['action']) && $_POST['action'] === 'confirm_logout') {
             color: #1e293b;
         }
 
-        /* --- Responsive Design --- */
         @media (max-width: 600px) {
             .navbar {
                 padding: 0 20px;
             }
             .user-nav-name {
-                display: none; /* Masque le nom dans la navbar sur mobile pour gagner de la place */
+                display: none;
             }
             .logout-card {
                 padding: 30px 20px;
@@ -279,10 +350,16 @@ if (isset($_POST['action']) && $_POST['action'] === 'confirm_logout') {
 <body>
 
     <header class="navbar">
-        <div class="logo">Mémoires<span>Univ</span></div>
+        <div class="brand_icon">
+                <div class="brand-icon">M</div>
+                <div class="brand">
+                    <h1>GénieMémoire</h1>
+                    <p>Plateforme universitaire</p>
+                </div>
+            </div>
         <div class="user-nav-profile">
-            <span class="user-nav-name"><?php echo $nom_complet; ?></span>
-            <div class="avatar"><?php echo $initiales; ?></div>
+            <span class="user-nav-name"><?= $nom_complet_html; ?></span>
+            <div class="avatar"><?= htmlspecialchars($initiales, ENT_QUOTES, 'UTF-8'); ?></div>
         </div>
     </header>
 
@@ -297,23 +374,24 @@ if (isset($_POST['action']) && $_POST['action'] === 'confirm_logout') {
 
             <h1 class="card-title">Se déconnecter ?</h1>
             <p class="card-description">
-                Vous êtes sur le point de vous déconnecter de votre compte. Vous devrez vous reconnecter pour accéder à la plateforme.
+                Vous êtes sur le point de vous déconnecter de votre compte. Vous devrez à nouveau vous authentifier pour accéder à GénieMémoire.
             </p>
 
             <div class="user-details-box">
-                <div class="avatar"><?php echo $initiales; ?></div>
+                <div class="avatar"><?= htmlspecialchars($initiales, ENT_QUOTES, 'UTF-8'); ?></div>
                 <div class="user-info">
-                    <span class="user-name"><?php echo $nom_complet; ?></span>
-                    <span class="user-email"><?php echo $email; ?></span>
+                    <span class="user-name"><?= $nom_complet_html; ?></span>
+                    <span class="user-email"><?= $email_html; ?></span>
                 </div>
             </div>
 
             <form method="POST" action="" class="actions-form">
                 <button type="submit" name="action" value="confirm_logout" class="btn btn-danger">
                     Oui, me déconnecter
+                    <i class="fa-solid fa-sign-out-alt"></i>
                 </button>
                 
-                <a href="dashboard.php" class="btn btn-secondary">
+                <a href="<?= htmlspecialchars($cancelUrl, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-secondary">
                     Annuler — Rester connecté
                 </a>
             </form>

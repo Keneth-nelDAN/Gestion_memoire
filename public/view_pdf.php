@@ -1,260 +1,203 @@
 ﻿<?php
 session_start();
+// Inclusion des configurations de base de données
 require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../config/mysqli_config.php';
 
-// 1. Validation de session ouverte et inclusive
-if (empty($_SESSION['user_id']) && empty($_SESSION['idetudiant'])) {
-    die("<div style='font-family: sans-serif; text-align: center; padding: 50px; background: #0f172a; color: #f8fafc; height: 100vh; box-sizing: border-box;'>
-        <h2 style='color: #ef4444;'>🚫 Accès refusé</h2>
-        <p>Veuillez vous connecter sur le portail universitaire de l'UATM GASA pour consulter ce mémoire.</p>
-        <a href='../auth/connexion.php' style='display: inline-block; margin-top: 20px; background: #4f46e5; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold;'>Se connecter</a>
-    </div>");
+// Ajustement de la session pour accepter tous les types d'utilisateurs connectés
+if (empty($_SESSION['idetudiant']) && empty($_SESSION['user_id']) && empty($_SESSION['id_user'])) {
+    die("Accès refusé. Veuillez vous connecter pour consulter les mémoires de l'UATM GASA.");
 }
 
-// 2. Récupération & sécurisation de l'ID du document
-$memoire_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
-$filePath = "";
-$themeMemo = "Rapport de recherche académique";
+$idAM = intval($_GET['id'] ?? 0);
+if ($idAM <= 0) {
+    die("Identifiant de mémoire non spécifié ou invalide.");
+}
 
-if ($memoire_id > 0 && isset($conn)) {
-    // Requête pour récupérer les données du mémoire
-    $query = "SELECT theme, fichier, chemin_pdf, document, chemin FROM ancien_memoire WHERE idAM = ?";
-    $stmt = mysqli_prepare($conn, $query);
-    if ($stmt) {
-        mysqli_stmt_bind_param($stmt, "i", $memoire_id);
-        mysqli_stmt_execute($stmt);
-        $result = mysqli_stmt_get_result($stmt);
-        if ($row = mysqli_fetch_assoc($result)) {
-            $themeMemo = $row['theme'] ?? $themeMemo;
-            // Détection dynamique de la colonne contenant le lien ou nom du fichier
-            $filePath = $row['fichier'] ?? $row['chemin_pdf'] ?? $row['document'] ?? $row['chemin'] ?? '';
+// Initialisation des variables de métadonnées
+$theme = "Mémoire Académique";
+$auteur = "Étudiant UATM GASA";
+$fileDBName = "";
+
+$sql = "SELECT am.*, f.nom_filiere, CONCAT(am.prenomAut, ' ', am.nomAut) AS auteur 
+        FROM ancien_memoire am 
+        LEFT JOIN filiere f ON f.idfiliere = am.idfiliere 
+        WHERE am.idAM = ?";
+$stmt = mysqli_prepare($conn, $sql);
+if ($stmt) {
+    mysqli_stmt_bind_param($stmt, "i", $idAM);
+    mysqli_stmt_execute($stmt);
+    $result = mysqli_stmt_get_result($stmt);
+    if ($row = mysqli_fetch_assoc($result)) {
+        $theme = $row['theme'];
+        $auteur = $row['auteur'];
+        
+        // Auto-détection de la colonne contenant le fichier
+        foreach (['fichier', 'fichier_pdf', 'chemin', 'pdf', 'url_pdf', 'document'] as $col) {
+            if (!empty($row[$col])) {
+                $fileDBName = $row[$col];
+                break;
+            }
         }
-        mysqli_stmt_close($stmt);
     }
 }
 
-// 3. Fallback de test à défaut de fichier dans la base de données
-if (empty($filePath)) {
-    $filePath = "uploads/exemples/sample_thesis.pdf"; 
-}
+// Traitement du chemin du PDF basé sur l'arborescence corrigée
+$baseDir = __DIR__ . '/../direction_etude/uploads/memoires/';
+$filePath = "";
 
-// IP & Informations d'Audit pour le Filigrane Dynamique
-$student_name = $_SESSION['user_name'] ?? $_SESSION['nom'] ?? 'Étudiant Consultateur';
-$client_ip = $_SERVER['REMOTE_ADDR'] ?? 'IP-VPN';
-$current_time = date('d/m/Y H:i');
-// Ce texte s'affichera directement sur le document
-$watermark_text = "UATM GASA - " . htmlspecialchars($student_name) . " (" . $client_ip . ") - Lu le " . $current_time . " - TOUTE COPIE INTERDITE";
+if (!empty($fileDBName)) {
+    // Extraction sécurisée du nom du fichier pour éviter les traversées de répertoires
+    $fileName = basename($fileDBName);
+    $filePath = $baseDir . $fileName;
 
-// 4. Flux local : Recherche intelligente sur plusieurs répertoires alternatifs
-$resolvedPath = "";
-$fileData = "";
-
-$searchPaths = [
-    $filePath,
-    __DIR__ . '/' . $filePath,
-    __DIR__ . '/../../../' . $filePath, // Si le fichier est stocké relativement à la racine du projet
-    __DIR__ . '/../../' . $filePath,
-    $_SERVER['DOCUMENT_ROOT'] . '/' . $filePath,
-    $_SERVER['DOCUMENT_ROOT'] . '/Gestion_memoire/' . $filePath,
-    "uploads/exemples/sample_thesis.pdf", // Dernier fallback de secours
-];
-
-foreach ($searchPaths as $path) {
-    if (!empty($path) && file_exists($path) && is_file($path)) {
-        $resolvedPath = $path;
-        $fileData = base64_encode(file_get_contents($path));
-        break;
+    // Fallback si jamais la base stocke un chemin relatif complexe
+    if (!file_exists($filePath)) {
+        $filePath = $baseDir . $fileDBName;
     }
 }
 
-$is_student = true; // Activer le mode sécurité maximale
+// Fallback vers un fichier template de démonstration si le fichier n'existe pas encore
+if (empty($filePath) || !file_exists($filePath)) {
+    $filePath = $baseDir . "sample_thesis.pdf";
+}
+
+// URL relative du point de sortie brute sécurisée (ne révèle jamais le chemin réel du fichier)
+$pdfUrl = "get_secure_stream.php?id=" . $idAM;
 ?>
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Lecteur Sécurisé GASA-Shield | UATM GASA Formation</title>
-    <!-- Chargement sécurisé de PDF.js stable -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GASA-Shield Reader - Protection Intégrale</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    
+    <!-- PDF.js - Chargement stable -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
-    <style>
-        body {
-            -webkit-user-select: none;
-            -moz-user-select: none;
-            -ms-user-select: none;
-            user-select: none;
-        }
-        /* Désactive complètement l'impression des éléments en cas de tentative (Bouton d'impression Ctrl+P) */
-        @media print {
-            body, html, canvas, #pdf-pages-container, .relative {
-                display: none !important;
-            }
-        }
-    </style>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+    </script>
 </head>
-<body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col justify-between">
+<body class="bg-slate-900 min-h-screen text-white select-none relative overflow-x-hidden">
 
-    <!-- En-tête sécurisé -->
-    <header class="bg-gray-800 border-b border-gray-700 px-6 py-4 flex items-center justify-between">
+    <!-- Header du Lecteur Sécurisé -->
+    <header class="bg-slate-950/80 backdrop-blur-md border-b border-indigo-500/10 px-6 py-4 fixed top-0 left-0 w-full z-20 flex justify-between items-center">
         <div class="flex items-center space-x-3">
-            <span class="bg-red-600 text-white font-black text-xs px-2.5 py-1 rounded tracking-widest uppercase">
-                GASA-SHIELD SECURE VIEW
+            <span class="p-2 bg-indigo-600 rounded-xl text-white">
+                <i class="fa-solid fa-lock"></i>
             </span>
             <div>
-                <h1 class="text-sm font-bold text-gray-100 italic" style="max-width: 450px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                    <?= htmlspecialchars($themeMemo, ENT_QUOTES, 'UTF-8') ?>
-                </h1>
-                <p class="text-xs text-indigo-300">Archivage Institutionnel &bull; UATM GASA Formation</p>
+                <h1 class="text-sm font-bold truncate max-w-sm sm:max-w-md text-slate-100"><?= htmlspecialchars($theme, ENT_QUOTES, 'UTF-8') ?></h1>
+                <p class="text-[10px] text-slate-400 font-semibold uppercase">Consulté par : <?= htmlspecialchars($auteur, ENT_QUOTES, 'UTF-8') ?></p>
             </div>
         </div>
-        <div class="flex items-center space-x-3 text-xs">
-            <span class="bg-gray-700 px-3 py-1.5 rounded text-indigo-200 font-semibold select-none">
-                Auditeur : <?= htmlspecialchars($student_name, ENT_QUOTES, 'UTF-8') ?> (<?= $client_ip ?>)
+        <div>
+            <span id="page-indicator" class="text-xs bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-lg text-slate-300 font-bold">
+                Lecteur Sécurisé GASA-Shield
             </span>
-            <button onclick="window.close();" class="bg-red-700 hover:bg-red-600 text-white font-bold px-4 py-1.5 rounded transition">
-                Fermer l'accès
-            </button>
         </div>
     </header>
 
-    <!-- Zone d'alerte sécurité -->
-    <div id="security-warning" class="hidden bg-yellow-500 text-gray-950 px-6 py-3 text-center text-xs font-bold animate-pulse">
-        ⚠️ [GASA-SHIELD] Téléchargement, impression et extraction de texte interdits pour préserver les droits d'auteur des étudiants de l'UATM GASA.
-    </div>
-
-    <!-- Zone de lecture principale -->
-    <main class="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col space-y-8 bg-gray-950 relative" id="pdf-scrollable-container">
-        
-        <div class="text-center text-xs text-gray-400 max-w-lg mx-auto bg-gray-900 p-3 rounded border border-gray-800">
-            🔒 Rendu vectoriel sécurisé actif. Aucun lien brut de fichier d'origine n'est transféré au navigateur.
+    <!-- Zone de rendu des pages protégées -->
+    <main class="pt-24 pb-12 flex flex-col items-center justify-center space-y-6">
+        <!-- Loader animé -->
+        <div id="loading" class="text-center py-20 space-y-4">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-indigo-500"></div>
+            <p class="text-sm text-slate-400">Chargement sécurisé du mémoire en cours...</p>
         </div>
 
-        <div id="pdf-pages-container" class="flex flex-col items-center space-y-6">
-            <div id="loading" class="text-indigo-400 text-sm py-12 flex flex-col items-center space-y-3">
-                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div>
-                <p class="font-bold">Déchiffrement et rendu sécurisé du mémoire...</p>
-            </div>
-        </div>
+        <!-- Conteneur global ordonné des pages -->
+        <div id="pdf-container" class="flex flex-col items-center gap-6"></div>
     </main>
 
-    <!-- Filigrane de pied de page -->
-    <footer class="bg-gray-800 border-t border-gray-700 text-center py-3 text-xs text-gray-400">
-        <p>&copy; <?= date('Y') ?> UATM GASA Formation. Ce document confidentiel est marqué d'une signature d'audit à votre adresse IP.</p>
-    </footer>
-
+    <!-- Script de rendering ordonné et blindage contre le piratage -->
     <script>
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+        const pdfUrl = '<?= $pdfUrl ?>';
+        const container = document.getElementById('pdf-container');
 
-        // Chargement hyper-sécurisé du PDF depuis la chaîne Base64 générée par le serveur
-        const base64Data = '<?= $fileData ?>';
-
-        if (base64Data.trim() === '') {
+        pdfjsLib.getDocument(pdfUrl).promise.then(function(pdf) {
             document.getElementById('loading').style.display = 'none';
-            document.getElementById('pdf-pages-container').innerHTML = `
-                <p class="text-rose-400 py-12 text-center font-bold">
-                    ⚠️ Erreur : Le document PDF d'origine n'a pas pu être localisé sur le serveur.<br>
-                    Veuillez contacter le secrétariat ou votre Directeur des Études.
-                </p>`;
-        } else {
-            // Conversion Base64 vers tableau binaire exploitable par PDF.js
-            const raw = window.atob(base64Data);
-            const rawLength = raw.length;
-            const array = new Uint8Array(new ArrayBuffer(rawLength));
 
-            for(let i = 0; i < rawLength; i++) {
-                array[i] = raw.charCodeAt(i);
+            // Pré-allocation ordonnée des balises de pages pour garantir l'ordre de lecture
+            for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                const pageWrapper = document.createElement('div');
+                pageWrapper.className = 'relative bg-white shadow-2xl rounded-xl border border-slate-700 overflow-hidden my-4';
+                pageWrapper.style.width = '750px';
+                pageWrapper.style.maxWidth = '90vw';
+                pageWrapper.id = 'page-wrapper-' + pageNum;
+
+                const canvas = document.createElement('canvas');
+                canvas.className = 'block mx-auto w-full';
+                canvas.id = 'canvas-page-' + pageNum;
+                pageWrapper.appendChild(canvas);
+
+                // Filigrane de sécurité diagonal
+                const watermark = document.createElement('div');
+                watermark.className = 'absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden z-10';
+                watermark.innerHTML = `
+                    <div style="
+                        transform: rotate(-30deg);
+                        font-size: 26px;
+                        font-weight: 800;
+                        color: rgba(99, 102, 241, 0.09);
+                        text-align: center;
+                        white-space: nowrap;
+                        user-select: none;
+                        line-height: 1.6;
+                        pointer-events: none;
+                    ">
+                        UATM GASA FORMATION<br>
+                        COPIE & REPRODUCTION INTERDITES<br>
+                        SÛRETÉ DES CONTENUS
+                    </div>
+                `;
+                pageWrapper.appendChild(watermark);
+                container.appendChild(pageWrapper);
+
+                // Rendu asynchrone sécurisé de la page correspondante
+                pdf.getPage(pageNum).then(function(page) {
+                    const canvasContext = canvas.getContext('2d');
+                    const viewport = page.getViewport({ scale: 1.3 });
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+
+                    const renderContext = {
+                        canvasContext: canvasContext,
+                        viewport: viewport
+                    };
+                    page.render(renderContext);
+                });
             }
-
-            const container = document.getElementById('pdf-pages-container');
-
-            pdfjsLib.getDocument({ data: array }).promise.then(function(pdf) {
-                document.getElementById('loading').style.display = 'none';
-
-                for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-                    pdf.getPage(pageNum).then(function(page) {
-                        
-                        // Conteneur de page (incluant le filigrane d'audit)
-                        const pageWrapper = document.createElement('div');
-                        pageWrapper.className = 'relative bg-white shadow-2xl rounded border border-gray-200 overflow-hidden my-4';
-                        pageWrapper.style.width = '780px'; 
-                        
-                        // Création du Canvas de dessin
-                        const canvas = document.createElement('canvas');
-                        canvas.className = 'block mx-auto';
-                        pageWrapper.appendChild(canvas);
-
-                        // Filigrane d'interdiction superposé en diagonale (Introuvable par script)
-                        const watermark = document.createElement('div');
-                        watermark.className = 'absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden';
-                        watermark.style.zIndex = '50';
-                        
-                        // Signature de traçabilité dynamique
-                        watermark.innerHTML = `
-                            <div style="
-                                transform: rotate(-25deg);
-                                font-size: 20px;
-                                font-weight: 900;
-                                color: rgba(220, 38, 38, 0.08);
-                                text-align: center;
-                                white-space: nowrap;
-                                user-select: none;
-                                line-height: 2;
-                            ">
-                                CONSULTE UNIQUEMENT SUR PORTAIL UATM<br>
-                                <?= $watermark_text ?><br>
-                                COPIE INTERDITE / PROPRIÉTÉ INTELLECTUELLE
-                            </div>
-                        `;
-                        pageWrapper.appendChild(watermark);
-                        container.appendChild(pageWrapper);
-
-                        const context = canvas.getContext('2d');
-                        const viewport = page.getViewport({ scale: 1.3 }); // Net d'écriture ajusté
-                        canvas.height = viewport.height;
-                        canvas.width = viewport.width;
-
-                        const renderContext = {
-                            canvasContext: context,
-                            viewport: viewport
-                        };
-                        page.render(renderContext);
-                    });
-                }
-            }).catch(err => {
-                console.error("Erreur de décryptage PDF :", err);
-                document.getElementById('loading').style.display = 'none';
-                container.innerHTML = `<p class="text-rose-400 py-12 text-center font-bold">Impossible de générer le rendu vectoriel du document. Type de PDF incompatible.</p>`;
-            });
-        }
-
-        // 🛡️ SÉCURITÉS SUPPLÉMENTAIRES (ANTI-COPIE & PRINT)
-        
-        // Clic droit interdit
-        document.addEventListener('contextmenu', function(e) {
-            e.preventDefault();
-            triggerSecurityAlert();
+        }).catch(function(error) {
+            console.error(error);
+            document.getElementById('loading').innerHTML = `
+                <div class="p-6 bg-rose-500/10 rounded-2xl border border-rose-500/30 max-w-md mx-auto">
+                    <i class="fa-solid fa-cloud-bolt text-rose-500 text-2xl mb-2"></i>
+                    <p class="text-sm font-bold text-rose-400">Le mémoire physique est introuvable ou en cours d'évaluation.</p>
+                </div>
+            `;
         });
 
-        // Désactiver copier/coller et raccourcis d'impression/sauvegarde
+        // 🛡️ ENTRAVES TECHNIQUES ANTIVOL / ANTI-DOWNLOAD 🛡️
+
+        // 1. Désactiver le clic droit
+        document.addEventListener('contextmenu', e => e.preventDefault());
+
+        // 2. Bloquer les tentatives d'impression et de sauvegarde (Ctrl+S, Ctrl+P, F12)
         document.addEventListener('keydown', function(e) {
-            if (
-                (e.ctrlKey && (e.key === 'p' || e.key === 'P' || e.key === 's' || e.key === 'S' || e.key === 'c' || e.key === 'C')) || 
-                (e.metaKey && (e.key === 'p' || e.key === 'P' || e.key === 's' || e.key === 'S' || e.key === 'c' || e.key === 'C')) ||
-                e.key === 'F12'
-            ) {
+            if (e.ctrlKey && (e.key === 'p' || e.key === 'P')) {
                 e.preventDefault();
-                triggerSecurityAlert();
+                alert("L'impression de ce mémoire est verrouillée pour des raisons de protection de la propriété intellectuelle.");
+            }
+            if (e.ctrlKey && (e.key === 's' || e.key === 'S')) {
+                e.preventDefault();
+            }
+            if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && e.key === 'I')) {
+                e.preventDefault();
             }
         });
-
-        function triggerSecurityAlert() {
-            const warnBanner = document.getElementById('security-warning');
-            warnBanner.classList.remove('hidden');
-            setTimeout(() => {
-                warnBanner.classList.add('hidden');
-            }, 6000);
-        }
     </script>
 </body>
 </html>

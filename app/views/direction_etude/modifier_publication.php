@@ -1,6 +1,7 @@
 ﻿<?php
 session_start();
 require_once __DIR__ . '/../../../config/database.php';
+require_once __DIR__ . '/../../../config/mysqli_config.php';
 require_once __DIR__ . '/de_helpers.php';
 
 function upload_pdf_file($file, $upload_dir, &$error) {
@@ -47,7 +48,7 @@ $initiales_de = $de_profile['initiales_de'];
 $id = (int) ($_GET['id'] ?? 0);
 $error = '';
 $success = '';
-$upload_dir = __DIR__ . '/uploads/memoires';
+$upload_dir = __DIR__ . 'Gestion_memoire/public/assets/uploads/memoires';
 
 $stmt = mysqli_prepare($conn, "SELECT am.*, f.nom_filiere, c.nomCentre FROM ancien_memoire am LEFT JOIN filiere f ON f.idfiliere = am.idfiliere LEFT JOIN centre c ON c.idCentre = am.idCentre WHERE am.idAM = ?");
 mysqli_stmt_bind_param($stmt, 'i', $id);
@@ -107,7 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 <body>
 <div class="app-container">
-    <?php include __DIR__ . '/sidebar.php'; ?>
+    <?php include __DIR__ . '/../partials/sidebar.php'; ?>
 
     <main class="workspace">
         <header class="workspace-header">

@@ -96,7 +96,7 @@ $nb_diplomes = (int) (mysqli_fetch_row($diplomes)[0] ?? 0);
 </head>
 <body>
 <div class="app-container">
-    <?php include __DIR__ . '/sidebar.php'; ?>
+    <?php include __DIR__ . '/../partials/sidebar.php'; ?>
 
     <main class="workspace">
         <header class="workspace-header">
@@ -152,7 +152,7 @@ $nb_diplomes = (int) (mysqli_fetch_row($diplomes)[0] ?? 0);
                     <div>
                         <label for="idCentre">Centre</label>
                         <select id="idCentre" name="idCentre" required>
-                            <option value="">SÃ©lectionner</option>
+                            <option value="">Sélectionner</option>
                             <?php if ($centres) { while ($centre = mysqli_fetch_assoc($centres)): ?>
                                 <option value="<?= (int) $centre['idCentre'] ?>"><?= e($centre['nomCentre']) ?></option>
                             <?php endwhile; } ?>
@@ -162,7 +162,7 @@ $nb_diplomes = (int) (mysqli_fetch_row($diplomes)[0] ?? 0);
 
                 <label for="idNiveau">Niveau</label>
                 <select id="idNiveau" name="idNiveau" required>
-                    <option value="">SÃ©lectionner</option>
+                    <option value="">Sélectionner</option>
                     <?php if ($niveaux) { while ($niveau = mysqli_fetch_assoc($niveaux)): ?>
                         <option value="<?= (int) $niveau['idNiveau'] ?>"><?= e($niveau['nomNiveau']) ?></option>
                     <?php endwhile; } ?>

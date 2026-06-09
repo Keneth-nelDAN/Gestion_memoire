@@ -3,63 +3,64 @@ session_start();
 require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../config/mysqli_config.php';
 
-if (empty($_SESSION['idetudiant']) && empty($_SESSION['user_id'])) {
-    die("Authentification requise.");
+// Barrière de sécurité : Seuls les utilisateurs connectés ont le droit de lire le flux binaire
+if (empty($_SESSION['idetudiant']) && empty($_SESSION['user_id']) && empty($_SESSION['id_user'])) {
+    header("HTTP/1.1 403 Forbidden");
+    die("Accès refusé. Veuillez vous authentifier.");
 }
 
 $idAM = intval($_GET['id'] ?? 0);
 if ($idAM <= 0) {
-    die("Requête invalide.");
+    header("HTTP/1.1 404 Not Found");
+    die("Identifiant d'archive invalide.");
 }
 
-$sql = "SELECT * FROM ancien_memoire WHERE idAM = ?";
+// Récupération de la référence binaire du fichier en base de données
+$fileDBName = "";
+$sql = "SELECT fichier FROM ancien_memoire WHERE idAM = ?";
 $stmt = mysqli_prepare($conn, $sql);
-mysqli_stmt_bind_param($stmt, "i", $idAM);
-mysqli_stmt_execute($stmt);
-$row = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
-
-if (!$row) {
-    die("Mémoire non instancié.");
+if ($stmt) {
+    mysqli_stmt_bind_param($stmt, "i", $idAM);
+    mysqli_stmt_execute($stmt);
+    $result = mysqli_stmt_get_result($stmt);
+    if ($row = mysqli_fetch_assoc($result)) {
+        $fileDBName = $row['fichier'];
+    }
 }
 
-// Auto-détection de la colonne fichier
-$fileDBName = '';
-foreach (['fichier', 'fichier_pdf', 'chemin', 'pdf', 'url_pdf', 'document'] as $col) {
-    if (!empty($row[$col])) {
-        $fileDBName = $row[$col];
+if (empty($fileDBName)) {
+    header("HTTP/1.1 404 Not Found");
+    die("Fichier introuvable en bdd.");
+}
+
+// Résolution intelligente du chemin réel du PDF (Direction des études)
+$possible_paths = [
+    __DIR__ . '/../direction_etude/uploads/memoires/' . $fileDBName,
+    __DIR__ . '/direction_etude/uploads/memoires/' . $fileDBName,
+    $_SERVER['DOCUMENT_ROOT'] . '/Gestion_memoire/app/views/direction_etude/uploads/memoires/' . $fileDBName
+];
+
+$filePath = "";
+foreach ($possible_paths as $path) {
+    if (file_exists($path) && is_file($path)) {
+        $filePath = $path;
         break;
     }
 }
 
-// Détection de l'emplacement réel sur votre serveur
-$filePath = "";
-if (!empty($fileDBName)) {
-    if (strpos($fileDBName, '/') !== false) {
-        $filePath = $fileDBName;
-    } else {
-        $filePath = "uploads/exemples/" . $fileDBName;
-        if (!file_exists(__DIR__ . '/../../../' . $filePath)) {
-            $filePath = "uploads/" . $fileDBName;
-        }
-    }
+if (empty($filePath)) {
+    header("HTTP/1.1 404 Not Found");
+    die("Le document physique n'existe pas sur le serveur.");
 }
 
-// Si absent, utiliser le PDF exemple par défaut pour l'expérience étudiant
-$realPath = __DIR__ . '/../../../' . $filePath;
-if (empty($filePath) || !file_exists($realPath)) {
-    $realPath = __DIR__ . '/../../../uploads/exemples/sample_thesis.pdf';
-}
+// Configuration des headers HTTP pour diffuser uniquement le flux brut compressé sans possibilité de mise en cache
+header("Content-Type: application/pdf");
+header("Content-Disposition: inline; filename=\"" . basename($filePath) . "\"");
+header("Content-Length: " . filesize($filePath));
+header("Cache-Control: no-cache, must-revalidate");
+header("Pragma: no-cache");
+header("Expires: 0");
 
-if (!file_exists($realPath)) {
-    die("Le document physique n'est pas ou n'est plus disponible sur le serveur.");
-}
-
-// Envoyer les en-têtes de flux binaire pour PDF.js en empêchant l'invitation au téléchargement
-header('Content-Type: application/pdf');
-header('Content-Disposition: inline; filename="document_protect.pdf"');
-header('Content-Transfer-Encoding: binary');
-header('Accept-Ranges: bytes');
-header('Cache-Control: private, no-transform, no-store, must-revalidate');
-
-readfile($realPath);
+// Lecture directe et silencieuse du flux binaire
+readfile($filePath);
 exit;

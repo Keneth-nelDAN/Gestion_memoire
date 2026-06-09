@@ -19,7 +19,7 @@ mysqli_stmt_bind_param($del, 'i', $id);
 mysqli_stmt_execute($del);
 
 if ($memoire && !empty($memoire['fichier'])) {
-    $path = __DIR__ . '/uploads/memoires/' . basename($memoire['fichier']);
+    $path = __DIR__ . 'Gestion_memoire/public/assets/uploads/memoires' . basename($memoire['fichier']);
     if (is_file($path)) {
         unlink($path);
     }

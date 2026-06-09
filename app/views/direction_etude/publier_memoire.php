@@ -1,7 +1,16 @@
 ﻿<?php
 session_start();
+// 1. INCLUSIONS DES CONFIGURATIONS DE BASE ET MYSQLI (Résout le problème de $conn non définie)
 require_once __DIR__ . '/../../../config/database.php';
+require_once __DIR__ . '/../../../config/mysqli_config.php';
 require_once __DIR__ . '/de_helpers.php';
+
+// Sécurité : Définition de la fonction d'échappement 'e' si elle n'existe pas
+if (!function_exists('e')) {
+    function e($string) {
+        return htmlspecialchars($string ?? '', ENT_QUOTES, 'UTF-8');
+    }
+}
 
 function upload_file_for_memoire($file, $upload_dir, &$error) {
     if (!isset($file) || $file['error'] === UPLOAD_ERR_NO_FILE) {
@@ -20,7 +29,7 @@ function upload_file_for_memoire($file, $upload_dir, &$error) {
     $mime = finfo_file($finfo, $file['tmp_name']);
     finfo_close($finfo);
     if ($mime !== 'application/pdf') {
-        $error = "Seuls les fichiers autorisés sont acceptés.";
+        $error = "Seuls les fichiers de type PDF sont autorisés.";
         return false;
     }
     if (!is_dir($upload_dir)) {
@@ -35,12 +44,14 @@ function upload_file_for_memoire($file, $upload_dir, &$error) {
     return $name;
 }
 
-$active_page = 'publications';
+$active_page = 'publication';
 $de_profile = get_de_profile($conn);
-$nom_de = $de_profile['nom_de'];
-$initiales_de = $de_profile['initiales_de'];
+$nom_de = $de_profile['nom_de'] ?? 'Direction';
+$initiales_de = $de_profile['initiales_de'] ?? 'DE';
 $idde = isset($_SESSION['idde']) ? (int) $_SESSION['idde'] : null;
-$upload_dir = __DIR__ . '/uploads/memoires';
+
+// Dossier exact défini par vos soins
+$upload_dir = __DIR__ . '/uploads/memoires/';
 $success = '';
 $error = '';
 
@@ -87,7 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 <body>
 <div class="app-container">
-    <?php include __DIR__ . '/sidebar.php'; ?>
+    <?php include __DIR__ . '/../partials/sidebar.php'; ?>
     <main class="workspace">
         <header class="workspace-header">
             <div>
