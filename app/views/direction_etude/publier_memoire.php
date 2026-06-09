@@ -98,7 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 <body>
 <div class="app-container">
-    <?php include __DIR__ . '/../partials/sidebar.php'; ?>
+    <?php include __DIR__ . '/../partials/sidebar_DE.php'; ?>
     <main class="workspace">
         <header class="workspace-header">
             <div>

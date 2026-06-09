@@ -67,7 +67,7 @@ $nb_professeurs = $professeurs ? mysqli_num_rows($professeurs) : 0;
 </head>
 <body>
 <div class="app-container">
-    <?php include __DIR__ . '/../partials/sidebar.php'; ?>
+    <?php include __DIR__ . '/../partials/sidebar_DE.php'; ?>
 
     <main class="workspace">
         <header class="workspace-header">
