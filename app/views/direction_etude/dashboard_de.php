@@ -333,10 +333,11 @@ if ($stmt) {
                                         href="view_pdf.php?id=<?= $memoire['idAM'] ?>"
                                         target="_blank"
                                         class="w-full inline-flex items-center justify-center px-4 py-2.5 bg-slate-950 hover:bg-slate-900 group-hover:bg-indigo-600 text-white font-bold text-xs rounded-xl transition-all shadow-sm gap-2"
+                                        style="background-color: #2563eb;"
                                     >
-                                                                        <i class="fa-solid fa-eye-slash text-xs"></i> Lire en lecture sécurisée
-                            </a>
-                        </div>
+                                        <i class="fa-solid fa-eye-slash text-xs"></i> Lire en lecture sécurisée
+                                    </a>
+                                </div>
                                 <a class="btn-blue" href="modifier_publication.php?id=<?= (int) $memoire['idAM'] ?>">
                                     <i class="fa-solid fa-pen-to-square"></i> Modifier
                                 </a>
