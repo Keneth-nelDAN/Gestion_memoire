@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 session_start();
 require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../config/mysqli_config.php';
@@ -149,16 +149,24 @@ if ($stmt) {
             </div>
             <div class="header-actions">
                 <a class="btn-gold" href="publier_memoire.php"><i class="fa-solid fa-plus"></i> Publier un mémoire</a>
-                <a class="btn-blue" href="publier_lots.php"><i class="fa-solid fa-layer-group"></i> Uploader plusieurs fichiers</a>
+                <a class="btn-blue" href="publier_lots.php"><i class="fa-solid fa-layer-group"></i> Publier plusieurs mémoires</a>
             </div>
         </header>
 
         <?php if (isset($_GET['status']) && $_GET['status'] === 'updated'): ?>
             <div class="alert success">Mémoire modifié avec succès. Les données affichées viennent directement de la base.</div>
         <?php endif; ?>
-        <?php if (isset($_GET['status']) && $_GET['status'] === 'deleted'): ?>
-            <div class="alert success">Mémoire supprimé avec succès. La liste est actualisée.</div>
+
+        <?php if (isset($_GET['status'])): ?>
+            <?php if ($_GET['status'] === 'deleted'): ?>
+                <div class="alert success text-xs">La publication et son fichier physique ont été supprimés de la bibliothèque universitaire.</div>
+            <?php elseif ($_GET['status'] === 'error_delete'): ?>
+                <div class="alert error text-xs">Une erreur SQL est survenue lors de la suppression du mémoire.</div>
+            <?php elseif ($_GET['status'] === 'not_found'): ?>
+                <div class="alert error text-xs">Le mémoire demandé n'existe pas ou a déjà été supprimé.</div>
+            <?php endif; ?>
         <?php endif; ?>
+        
         <?php if ($dashboard_success !== ''): ?>
             <div class="alert success">
                 <?= e($dashboard_success) ?>
@@ -205,7 +213,7 @@ if ($stmt) {
         </section>
             <hr style="border: none; border-top: 3px solid #333; width: 50%;">
             <br/>
-        <section class="quick-actions">
+        <!-- <section class="quick-actions">
             <a href="publier_memoire.php"><i class="fa-solid fa-file-circle-plus"></i><span>Publier un mémoire</span></a>
             <a href="publier_lots.php"><i class="fa-solid fa-cloud-arrow-up"></i><span>Uploader plusieurs fichiers</span></a>
             <a href="etudiants_de.php"><i class="fa-solid fa-users"></i><span>Créer un compte étudiant</span></a>
@@ -213,7 +221,7 @@ if ($stmt) {
         </section>
             <hr style="border: none; border-top: 3px solid #333; width: 50%;">
             <br/>
-        <!-- <section class="dashboard-professor-panel" id="ajouter-professeur">
+        <section class="dashboard-professor-panel" id="ajouter-professeur">
             <article class="form-card dashboard-professor-form">
                 <div class="section-heading">
                     <div>

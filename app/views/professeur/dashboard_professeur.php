@@ -1,10 +1,16 @@
 <?php
 session_start();
+
+// Définir la constante pour sécuriser les fichiers inclus si nécessaire
+define('SECURE_ACCESS', true);
+
+// Configuration des fichiers de connexion de la base de données
+// Ajustez les chemins réels si votre structure diffère
 require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../config/mysqli_config.php';
 
 // Vérifier si l'utilisateur est connecté et est un professeur
-if (empty($_SESSION['idprof']) && (empty($_SESSION['user']) || $_SESSION['user']['type'] !== 'professeur')) {
+if (empty($_SESSION['user']) || ($_SESSION['user']['type'] !== 'professeur' && $_SESSION['user']['type'] !== 'professeur')) {
     header('Location: ../auth/connexion.php');
     exit;
 }
@@ -15,11 +21,16 @@ if (!$idprof) {
     exit;
 }
 
-// Récupérer les informations du professeur
-$stmt = mysqli_prepare($conn, "SELECT idprof, nom, prenom, email FROM professeur WHERE idprof = ? LIMIT 1");
-mysqli_stmt_bind_param($stmt, 'i', $idprof);
-mysqli_stmt_execute($stmt);
-$professor = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
+// Récupérer les informations détaillées du professeur - Colonnes garanties existantes
+$professor = null;
+$stmt_simple = mysqli_prepare($conn, "SELECT idprof, nom, prenom, email FROM professeur WHERE idprof = ? LIMIT 1");
+if ($stmt_simple) {
+    mysqli_stmt_bind_param($stmt_simple, 'i', $idprof);
+    mysqli_stmt_execute($stmt_simple);
+    $result_simple = mysqli_stmt_get_result($stmt_simple);
+    $professor = mysqli_fetch_assoc($result_simple);
+    mysqli_stmt_close($stmt_simple);
+}
 
 if (!$professor) {
     header('Location: ../auth/connexion.php');
@@ -29,204 +40,674 @@ if (!$professor) {
 $prenom = htmlspecialchars($professor['prenom'] ?? '', ENT_QUOTES, 'UTF-8');
 $nom = htmlspecialchars($professor['nom'] ?? '', ENT_QUOTES, 'UTF-8');
 $email = htmlspecialchars($professor['email'] ?? '', ENT_QUOTES, 'UTF-8');
+$specialty = 'Enseignant-Chercheur';
+$department = 'DST (Sciences et Technologies)';
 
-// Récupérer les statistiques
-$nb_evaluations = (int) (mysqli_fetch_row(mysqli_query($conn, "SELECT COUNT(*) FROM ancien_memoire WHERE examinateur = '$email' OR maitre_memoire = '$email' OR president_jury = '$email'"))[0] ?? 0);
-$nb_a_valider = (int) (mysqli_fetch_row(mysqli_query($conn, "SELECT COUNT(*) FROM ancien_memoire WHERE statut = 'en_attente' AND (examinateur = '$email' OR maitre_memoire = '$email' OR president_jury = '$email')"))[0] ?? 0);
-$nb_valides = (int) (mysqli_fetch_row(mysqli_query($conn, "SELECT COUNT(*) FROM ancien_memoire WHERE statut IN ('valide','publié','publié') AND (examinateur = '$email' OR maitre_memoire = '$email' OR president_jury = '$email')"))[0] ?? 0);
+// Éviter les injections SQL indirectes sur les données récupérées en base
+$email_escaped = mysqli_real_escape_string($conn, $email);
+
+// 1. Essai de récupération des statistiques depuis JURY et MEMOIRE (schéma actif)
+$jury_ok = false;
+$nb_evaluations = 0;
+$nb_a_valider = 0;
+$nb_valides = 0;
+$recent_memos = [];
+
+$res_total = mysqli_query($conn, "SELECT COUNT(*) FROM jury WHERE idprof = $idprof");
+if ($res_total) {
+    $jury_ok = true;
+    $nb_evaluations = mysqli_fetch_row($res_total)[0] ?? 0;
+    
+    $res_attente = mysqli_query($conn, "SELECT COUNT(*) FROM jury WHERE idprof = $idprof AND (decision IS NULL OR decision = '' OR decision = 'en_attente')");
+    $nb_a_valider = $res_attente ? (mysqli_fetch_row($res_attente)[0] ?? 0) : 0;
+    
+    $res_valide = mysqli_query($conn, "SELECT COUNT(*) FROM jury WHERE idprof = $idprof AND decision IS NOT NULL AND decision <> '' AND decision <> 'en_attente' AND decision <> 'refuse'");
+    $nb_valides = $res_valide ? (mysqli_fetch_row($res_valide)[0] ?? 0) : 0;
+    
+    // Récupérer les mémoires récents depuis le jury actif
+    $res_recent = mysqli_query($conn, "
+        SELECT m.idmemoire AS id, m.theme AS theme, m.theme AS titre, 
+               CONCAT(e.prenom, ' ', e.nom) AS etudiant, 
+               f.nom_filiere AS filiere, e.niveau AS niveau, m.statut AS statut, 
+               m.datesoumission AS date_depot, j.decision AS note
+        FROM jury j
+        JOIN memoire m ON j.idmemoire = m.idmemoire
+        JOIN etudiant e ON m.idetudiant = e.idetudiant
+        LEFT JOIN filiere f ON m.idfiliere = f.idfiliere
+        WHERE j.idprof = $idprof
+        ORDER BY m.idmemoire DESC LIMIT 5
+    ");
+    if ($res_recent) {
+        while ($row = mysqli_fetch_assoc($res_recent)) {
+            $recent_memos[] = $row;
+        }
+    }
+}
+
+// 2. Si non trouvé ou échec, fallback adaptatif sur la table `ancien_memoire`
+if (!$jury_ok || ($nb_evaluations == 0 && empty($recent_memos))) {
+    // Essai sur `ancien_memoire`
+    $res_total = mysqli_query($conn, "SELECT COUNT(*) FROM `ancien_memoire` WHERE examinateur = '$email_escaped' OR president_jury = '$email_escaped'");
+    if ($res_total) {
+        $nb_evaluations = mysqli_fetch_row($res_total)[0] ?? 0;
+        
+        $res_attente = mysqli_query($conn, "SELECT COUNT(*) FROM `ancien_memoire` WHERE statut = 'en_attente' AND (examinateur = '$email_escaped' OR president_jury = '$email_escaped')");
+        $nb_a_valider = $res_attente ? (mysqli_fetch_row($res_attente)[0] ?? 0) : 0;
+        
+        $res_valide = mysqli_query($conn, "SELECT COUNT(*) FROM `ancien_memoire` WHERE statut IN ('valide', 'publié', 'publie') AND (examinateur = '$email_escaped' OR president_jury = '$email_escaped')");
+        $nb_valides = $res_valide ? (mysqli_fetch_row($res_valide)[0] ?? 0) : 0;
+        
+        $res_recent = mysqli_query($conn, "
+            SELECT idAM AS id, theme AS theme, theme AS titre, 
+                   CONCAT(prenomAut, ' ', nomAut) AS etudiant, 
+                   (SELECT nom_filiere FROM filiere WHERE idfiliere = `ancien_memoire`.idfiliere LIMIT 1) AS filiere, 
+                   (SELECT nomNiveau FROM niveau WHERE idNiveau = `ancien_memoire`.idNiveau LIMIT 1) AS niveau, 
+                   statut, date_depot, '' AS note
+            FROM `ancien_memoire` 
+            WHERE examinateur = '$email_escaped' OR president_jury = '$email_escaped' 
+            ORDER BY idAM DESC LIMIT 5
+        ");
+        if ($res_recent) {
+            $recent_memos = [];
+            while ($row = mysqli_fetch_assoc($res_recent)) {
+                $recent_memos[] = $row;
+            }
+        }
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tableau de bord - Professeur</title>
+    <title>Espace Enseignant - GénieMémoire UATM</title>
+    <!-- Bootstrap 5.3 + FontAwesome 6.4.0 -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
     <style>
-        body {
-            background-color: #f5f7fa;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        :root {
+            --bg-primary: #f8fafc;
+            --sidebar-width: 290px;
+            --color-gasa-blue: #1e3a8a;
+            --color-gasa-dark: #0f172a;
+            --color-gasa-gold: #d97706;
+            --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+            --font-display: 'Space Grotesk', sans-serif;
+            --border-radius-lg: 16px;
+            --border-radius-xl: 24px;
+            --box-shadow-soft: 0 4px 20px -2px rgba(15, 23, 42, 0.06), 0 2px 8px -1px rgba(15, 23, 42, 0.03);
+            --transition-smooth: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
         }
+
+        body {
+            background-color: var(--bg-primary);
+            font-family: var(--font-sans);
+            color: #334155;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
         .page-wrapper {
             display: flex;
             min-height: 100vh;
         }
+
+        /* SIDEBAR PREMIUM STYLE */
         .sidebar {
-            width: 280px;
-            background: linear-gradient(180deg, #2c5aa0 0%, #1a3a52 100%);
-            color: white;
-            padding: 32px 24px;
+            width: var(--sidebar-width);
+            background: linear-gradient(135deg, var(--color-gasa-dark) 0%, #1e1b4b 100%);
+            color: rgba(255, 255, 255, 0.85);
+            padding: 32px 20px;
             display: flex;
             flex-direction: column;
-            gap: 28px;
+            gap: 24px;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+            z-index: 1000;
+            border-right: 1px solid rgba(255, 255, 255, 0.08);
+            transition: var(--transition-smooth);
         }
+
+        .logo-block {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding-bottom: 20px;
+            border-b: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
         .logo-icon {
-            width: 46px;
-            height: 46px;
-            border-radius: 14px;
-            background-color: #d4af37;
-            color: #1a3a52;
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #fbbf24 0%, #d97706 100%);
+            color: #0f172a;
             display: inline-flex;
             align-items: center;
             justify-content: center;
+            font-family: var(--font-display);
             font-weight: 700;
             font-size: 20px;
+            box-shadow: 0 4px 12px rgba(217, 119, 6, 0.35);
         }
+
+        .logo-title {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 18px;
+            color: #ffffff;
+            letter-spacing: -0.025em;
+            margin: 0;
+        }
+
+        .logo-subtitle {
+            font-size: 11px;
+            color: #93c5fd;
+            margin: 2px 0 0;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            font-weight: 600;
+        }
+
+        /* Glassmorphism Profile Sidebar */
+        .profile-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: var(--border-radius-lg);
+            padding: 16px;
+            margin-bottom: 8px;
+        }
+
+        .profile-card h3 {
+            color: #ffffff;
+            font-size: 15px;
+            font-weight: 700;
+            margin: 0 0 4px 0;
+            line-height: 1.3;
+        }
+
+        .profile-card p {
+            color: #b4c6fc;
+            font-size: 12px;
+            margin: 0;
+        }
+
+        /* Nav Menu */
         .nav-menu {
             list-style: none;
             padding: 0;
             margin: 0;
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 8px;
         }
-        .nav-menu a {
+
+        .nav-menu li a {
             display: flex;
             align-items: center;
             gap: 14px;
-            padding: 14px 18px;
-            color: #d7e5f7;
-            text-decoration: none;
-            border-radius: 16px;
-            transition: all 0.2s;
-        }
-        .nav-menu a.active,
-        .nav-menu a:hover {
-            background: rgba(255, 255, 255, 0.1);
-            color: white;
-        }
-        .main {
-            flex: 1;
-            padding: 32px;
-        }
-        .main-header h1 {
-            font-size: 32px;
-            margin: 0 0 8px 0;
-            color: #1a2d40;
-        }
-        .cards-grid {
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 20px;
-            margin-bottom: 32px;
-        }
-        .stat-card {
-            background: white;
-            border-radius: 24px;
-            padding: 24px;
-            box-shadow: 0 4px 16px rgba(26, 58, 82, 0.08);
-            border: 1px solid rgba(30, 72, 124, 0.06);
-        }
-        .stat-card small {
-            display: block;
-            color: #758299;
-            margin-bottom: 14px;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            font-size: 12px;
-        }
-        .stat-card h2 {
-            margin: 0;
-            font-size: 36px;
-            color: #10273f;
-        }
-        .stat-label {
-            display: flex;
-            gap: 8px;
-            margin-top: 16px;
-            color: #5b7a9d;
+            padding: 12px 16px;
+            color: #94a3b8;
             font-size: 14px;
-            align-items: center;
+            font-weight: 500;
+            text-decoration: none;
+            border-radius: 12px;
+            transition: var(--transition-smooth);
         }
+
+        .nav-menu li a i {
+            font-size: 18px;
+            width: 24px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .nav-menu li a:hover {
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .nav-menu li a.active {
+            background: linear-gradient(135deg, #fbbf24 0%, #d97706 100%);
+            color: #0f172a;
+            font-weight: 600;
+            box-shadow: 0 4px 14px rgba(217, 119, 6, 0.2);
+        }
+
         .logout-button {
             margin-top: auto;
             display: flex;
             align-items: center;
-            gap: 10px;
-            padding: 14px 18px;
-            border-radius: 18px;
-            background: rgba(255, 255, 255, 0.1);
-            color: #f8f9fb;
+            gap: 12px;
+            padding: 12px 16px;
+            background: rgba(239, 68, 68, 0.1);
+            color: #fca5a5;
+            border-radius: 12px;
+            font-size: 14px;
             text-decoration: none;
-            font-weight: 700;
-            transition: all 0.2s;
+            font-weight: 600;
+            border: 1px solid rgba(239, 68, 68, 0.15);
+            transition: var(--transition-smooth);
         }
+
         .logout-button:hover {
-            background: rgba(255, 255, 255, 0.2);
+            background: #ef4444;
+            color: #ffffff;
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+        }
+
+        /* MAIN CONTENT AREA */
+        .main {
+            flex: 1;
+            margin-left: var(--sidebar-width);
+            padding: 40px;
+            transition: var(--transition-smooth);
+        }
+
+        .main-header h1 {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 30px;
+            color: var(--color-gasa-dark);
+            letter-spacing: -0.02em;
+            margin: 0;
+        }
+
+        .main-header p {
+            color: #64748b;
+            margin: 4px 0 0;
+            font-size: 14px;
+        }
+
+        /* BENTO STATS GRID */
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 24px;
+            margin-bottom: 36px;
+        }
+
+        .stat-card {
+            background: #ffffff;
+            border-radius: var(--border-radius-lg);
+            padding: 24px;
+            border: 1px solid #e2e8f0;
+            box-shadow: var(--box-shadow-soft);
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            transition: var(--transition-smooth);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.08); /* Modern, soft elevation */
+            border-color: #cbd5e1;
+        }
+
+        .stat-card .stat-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .stat-card small {
+            font-size: 11px;
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: 0.07em;
+            color: #64748b;
+        }
+
+        .stat-card h2 {
+            margin: 4px 0 0 0;
+            font-size: 36px;
+            font-weight: 800;
+            color: var(--color-gasa-dark);
+            font-family: var(--font-display);
+        }
+
+        .stat-card .stat-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 12px;
+            color: #64748b;
+            font-size: 13px;
+        }
+
+        .stat-card .stat-icon-wrapper {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .icon-total {
+            background: rgba(30, 58, 138, 0.08);
+            color: var(--color-gasa-blue);
+        }
+
+        .icon-pending {
+            background: rgba(217, 119, 6, 0.08);
+            color: var(--color-gasa-gold);
+        }
+
+        .icon-validated {
+            background: rgba(16, 185, 129, 0.08);
+            color: #10b981;
+        }
+
+        /* SECTION CARD BLOCK */
+        .section-card {
+            background: #ffffff;
+            border-radius: var(--border-radius-xl);
+            padding: 30px;
+            border: 1px solid #e2e8f0;
+            box-shadow: var(--box-shadow-soft);
+            margin-bottom: 30px;
+        }
+
+        .section-card h3 {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 20px;
+            color: var(--color-gasa-dark);
+            margin: 0 0 20px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Table design */
+        .table-responsive {
+            border-radius: var(--border-radius-lg);
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
+        }
+
+        .table-custom {
+            margin-bottom: 0;
+            font-size: 13px;
+        }
+
+        .table-custom th {
+            background-color: #f1f5f9;
+            color: #475569;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.05em;
+            padding: 14px 16px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        .table-custom td {
+            padding: 14px 16px;
+            vertical-align: middle;
+            color: #475569;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .table-custom tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .table-custom tbody tr:hover td {
+            background-color: #f8fafc;
+        }
+
+        /* Badges */
+        .badge-status {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 6px 10px;
+            border-radius: 8px;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .badge-status-en-attente {
+            background-color: #fef3c7;
+            color: #d97706;
+        }
+
+        .badge-status-valide {
+            background-color: #d1fae5;
+            color: #059669;
+        }
+
+        .badge-status-publie, .badge-status-publié {
+            background-color: #dbeafe;
+            color: #2563eb;
+        }
+
+        /* Mobile Hamburger Hamburger (Responsive) */
+        .mobile-header {
+            display: none;
+            background-color: var(--color-gasa-dark);
+            color: white;
+            padding: 16px 20px;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        @media (max-width: 991px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            .sidebar.active {
+                transform: translateX(0);
+            }
+            .main {
+                margin-left: 0;
+                padding: 24px;
+            }
+            .mobile-header {
+                display: flex;
+            }
+            .cards-grid {
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
         }
     </style>
 </head>
 <body>
+
+    <!-- Mobile Header for responsive views -->
+    <div class="mobile-header d-lg-none" id="mobileHeader">
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <span class="logo-icon">M</span>
+            <span class="logo-title">GénieMémoire</span>
+        </div>
+        <button class="btn text-white fs-4 p-0 border-0" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+    </div>
+
     <div class="page-wrapper">
-        <aside class="sidebar">
-            <div style="display: flex; align-items: center; gap: 14px;">
-                <span class="logo-icon">M</span>
-                <div>
-                    <p style="margin: 0; font-size: 16px; font-weight: 700;">GénieMémoire</p>
-                    <p style="margin: 4px 0 0; font-size: 13px; color: #b8d3ff;">Espace Professeur</p>
-                </div>
-            </div>
+        
+        <?php include __DIR__ . '/../partials/sidebar_PROF.php'; ?>
 
-            <div style="padding: 18px; background: rgba(255, 255, 255, 0.08); border-radius: 20px;">
-                <h3 style="margin: 0; font-size: 18px; font-weight: 700;"><?php echo htmlspecialchars($prenom . ' ' . $nom); ?></h3>
-                <p style="margin: 6px 0 0; color: #b2c7dc; font-size: 14px;">Professeur</p>
-            </div>
-
-            <ul class="nav-menu">
-                <li><a class="active" href="/Gestion_memoire/app/views/professeur/dashboard_professeur.php"><i class="fas fa-tachometer-alt"></i> Tableau de bord</a></li>
-                <li><a href="/Gestion_memoire/app/views/professeur/memoire_jury.php"><i class="fas fa-book-open"></i> Mémoires en jury</a></li>
-                <li><a href="/Gestion_memoire/app/views/professeur/validation_memoire.php"><i class="fas fa-check-circle"></i> Validations</a></li>
-                <li><a href="/Gestion_memoire/app/views/professeur/notifications.php"><i class="fas fa-bell"></i> Notifications</a></li>
-            </ul>
-
-            <a href="/Gestion_memoire/public/logout.php" class="logout-button"><i class="fas fa-sign-out-alt"></i> Déconnexion</a>
-        </aside>
-
+        <!-- MAIN AREA -->
         <main class="main">
-            <div class="main-header" style="margin-bottom: 28px;">
+            
+            <!-- Main Title Header -->
+            <div class="main-header d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
                 <div>
                     <h1>Tableau de bord</h1>
-                    <p style="color: #66758d; margin: 6px 0 0;">Vue d'ensemble · <?php echo date('F Y'); ?></p>
+                    <p>Vue d'ensemble et pilotage pédagogique d'évaluation · <?php echo date('F Y'); ?></p>
+                </div>
+                <div class="bg-white px-3 py-2 border border-slate-200 rounded-pill shadow-xs text-xs font-semibold d-flex align-items-center gap-2">
+                    <span class="bg-success rounded-circle" style="width: 8px; height: 8px; display: inline-block;"></span>
+                    <span>Direct académique connecté</span>
                 </div>
             </div>
 
+            <!-- BENTO STATS CARDS -->
             <div class="cards-grid">
+                <!-- Card 1: Total -->
                 <div class="stat-card">
-                    <small>Évaluations totales</small>
-                    <h2><?php echo $nb_evaluations; ?></h2>
-                    <div class="stat-label"><i class="fas fa-book-open"></i> Mémoires assignés</div>
+                    <div class="stat-info">
+                        <small>Évaluations affectées</small>
+                        <h2><?php echo $nb_evaluations; ?></h2>
+                        <div class="stat-label">
+                            <i class="fas fa-book-open text-primary"></i>
+                            <span>Mémoires au total</span>
+                        </div>
+                    </div>
+                    <div class="stat-icon-wrapper icon-total">
+                        <i class="fas fa-file-signature"></i>
+                    </div>
                 </div>
+
+                <!-- Card 2: Pending -->
                 <div class="stat-card">
-                    <small>En attente de validation</small>
-                    <h2><?php echo $nb_a_valider; ?></h2>
-                    <div class="stat-label"><i class="fas fa-clock"></i> À examiner</div>
+                    <div class="stat-info">
+                        <small>Attente d'évaluation</small>
+                        <h2><?php echo $nb_a_valider; ?></h2>
+                        <div class="stat-label">
+                            <i class="fas fa-clock text-warning animate-pulse"></i>
+                            <span>Avis de jury requis</span>
+                        </div>
+                    </div>
+                    <div class="stat-icon-wrapper icon-pending">
+                        <i class="fas fa-spinner fa-spin-hover"></i>
+                    </div>
                 </div>
+
+                <!-- Card 3: Approved -->
                 <div class="stat-card">
-                    <small>Validés par vous</small>
-                    <h2><?php echo $nb_valides; ?></h2>
-                    <div class="stat-label"><i class="fas fa-check"></i> Approuvés</div>
+                    <div class="stat-info">
+                        <small>Approuvés par vous</small>
+                        <h2><?php echo $nb_valides; ?></h2>
+                        <div class="stat-label">
+                            <i class="fas fa-check-double text-success"></i>
+                            <span>Soutenances archivées</span>
+                        </div>
+                    </div>
+                    <div class="stat-icon-wrapper icon-validated">
+                        <i class="fas fa-clipboard-check"></i>
+                    </div>
                 </div>
             </div>
 
-            <div style="background: white; border-radius: 24px; padding: 28px; box-shadow: 0 4px 16px rgba(26, 58, 82, 0.08);">
-                <h3 style="margin-top: 0; color: #10273f; font-size: 24px;">Informations de profil</h3>
-                <table style="width: 100%; margin-top: 20px;">
-                    <tr>
-                        <td style="padding: 12px 0; border-bottom: 1px solid #e9edf3; color: #6c7c9a;">Prénom</td>
-                        <td style="padding: 12px 0; border-bottom: 1px solid #e9edf3; color: #1a2d40;"><?php echo $prenom; ?></td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 12px 0; border-bottom: 1px solid #e9edf3; color: #6c7c9a;">Nom</td>
-                        <td style="padding: 12px 0; border-bottom: 1px solid #e9edf3; color: #1a2d40;"><?php echo $nom; ?></td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 12px 0; color: #6c7c9a;">Email</td>
-                        <td style="padding: 12px 0; color: #1a2d40;"><?php echo $email; ?></td>
-                    </tr>
-                </table>
+            <div class="row">
+                <!-- LEFT COLUMN: Profile Info DetailsCard -->
+                <div class="col-xl-5 col-lg-12 mb-4">
+                    <div class="section-card h-100">
+                        <h3><i class="fas fa-id-card text-muted"></i> Profil Enseignant</h3>
+                        
+                        <div class="text-center py-3 mb-4 border-bottom border-light">
+                            <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 72px; height: 72px; font-size: 28px; font-weight: 700; background: linear-gradient(135deg, var(--color-gasa-blue) 0%, #3b82f6 100%) !important;">
+                                <?php echo substr($prenom, 0, 1) . substr($nom, 0, 1); ?>
+                            </div>
+                            <h4 class="h5 mb-1 text-slate-900"><?php echo $prenom . ' ' . $nom; ?></h4>
+                            <span class="badge bg-secondary-subtle text-secondary px-3 py-1.5 rounded-pill text-xs font-semibold uppercase">
+                                <?php echo $specialty; ?>
+                            </span>
+                        </div>
+
+                        <ul class="list-group list-group-flush" style="font-size: 13.5px;">
+                            <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-3 bg-transparent">
+                                <span class="text-muted">Prénom</span>
+                                <strong class="text-slate-900"><?php echo $prenom; ?></strong>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-3 bg-transparent">
+                                <span class="text-muted">Nom</span>
+                                <strong class="text-slate-900"><?php echo $nom; ?></strong>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-3 bg-transparent">
+                                <span class="text-muted">Messagerie</span>
+                                <strong class="text-slate-800 font-mono" style="font-size: 12px;"><?php echo $email; ?></strong>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-3 bg-transparent border-0">
+                                <span class="text-muted">Département académique</span>
+                                <strong class="text-slate-700 text-end text-[12px]"><?php echo $department; ?></strong>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- RIGHT COLUMN: Active / assigned memoirs list -->
+                <div class="col-xl-7 col-lg-12 mb-4">
+                    <div class="section-card h-100">
+                        <div class="d-flex align-items-center justify-content-between mb-4">
+                            <h3><i class="fas fa-folder-open text-muted"></i> Travaux Récents</h3>
+                            <a href="memoire_jury.php" class="btn btn-sm btn-outline-primary" style="font-size: 12px; font-weight: 600; border-radius: 8px;">
+                                Voir tout <i class="fas fa-arrow-right list-arrow ms-1"></i>
+                            </a>
+                        </div>
+
+                        <?php if (empty($recent_memos)): ?>
+                            <div class="text-center py-5">
+                                <i class="fas fa-archive text-light d-block mb-3" style="font-size: 64px;"></i>
+                                <p class="text-muted mb-0">Aucun mémoire de jury assigné à ce jour.</p>
+                            </div>
+                        <?php else: ?>
+                            <div class="table-responsive">
+                                <table class="table table-custom table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Sujet / Titre de Thèse</th>
+                                            <th>Étudiant</th>
+                                            <th>Filière</th>
+                                            <th>Statut</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($recent_memos as $memo): ?>
+                                            <tr>
+                                                <td class="font-semibold text-slate-800" style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                                    <a href="memoire_jury.php" title="<?php echo htmlspecialchars($memo['titre']); ?>" class="text-decoration-none text-dark hover:text-primary">
+                                                        <?php echo htmlspecialchars($memo['titre']); ?>
+                                                    </a>
+                                                </td>
+                                                <td>
+                                                    <span class="font-medium text-slate-700"><?php echo htmlspecialchars($memo['etudiant'] ?? 'Non renseigné'); ?></span>
+                                                </td>
+                                                <td>
+                                                    <span class="text-xs font-semibold badge bg-light text-slate-650 rounded"><?php echo htmlspecialchars($memo['filiere']); ?></span>
+                                                </td>
+                                                <td>
+                                                    <?php $st = strtolower($memo['statut'] ?? ''); ?>
+                                                    <span class="badge-status badge-status-<?php echo $st == 'publié' ? 'publie' : $st; ?>">
+                                                        <span class="rounded-circle" style="width: 6px; height: 6px; background-color: currentColor; display: inline-block;"></span>
+                                                        <?php echo htmlspecialchars(ucfirst($memo['statut'])); ?>
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
             </div>
+
         </main>
     </div>
+
+    <!-- JS for Mobile layout interaction -->
+    <script>
+        function toggleSidebar() {
+            var sidebar = document.getElementById('appSidebar');
+            sidebar.classList.toggle('active');
+        }
+    </script>
 </body>
 </html>

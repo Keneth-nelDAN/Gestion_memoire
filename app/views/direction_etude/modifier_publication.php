@@ -48,7 +48,7 @@ $initiales_de = $de_profile['initiales_de'];
 $id = (int) ($_GET['id'] ?? 0);
 $error = '';
 $success = '';
-$upload_dir = __DIR__ . 'Gestion_memoire/public/assets/uploads/memoires';
+$upload_dir = __DIR__ . '/uploads/memoires';
 
 $stmt = mysqli_prepare($conn, "SELECT am.*, f.nom_filiere, c.nomCentre FROM ancien_memoire am LEFT JOIN filiere f ON f.idfiliere = am.idfiliere LEFT JOIN centre c ON c.idCentre = am.idCentre WHERE am.idAM = ?");
 mysqli_stmt_bind_param($stmt, 'i', $id);
