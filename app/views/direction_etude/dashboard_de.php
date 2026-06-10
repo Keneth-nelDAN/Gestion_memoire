@@ -328,12 +328,49 @@ if ($stmt) {
                             </div>
 
                             <div class="memoire-card-actions">
+                                <div class="pt-5 mt-5 border-t border-slate-100">
+                                    <a
+                                        href="view_pdf.php?id=<?= $memoire['idAM'] ?>"
+                                        target="_blank"
+                                        class="w-full inline-flex items-center justify-center px-4 py-2.5 bg-slate-950 hover:bg-slate-900 group-hover:bg-indigo-600 text-white font-bold text-xs rounded-xl transition-all shadow-sm gap-2"
+                                    >
+                                                                        <i class="fa-solid fa-eye-slash text-xs"></i> Lire en lecture sécurisée
+                            </a>
+                        </div>
                                 <a class="btn-blue" href="modifier_publication.php?id=<?= (int) $memoire['idAM'] ?>">
                                     <i class="fa-solid fa-pen-to-square"></i> Modifier
                                 </a>
-                                <a class="btn-danger" href="supprimer_pubication.php?id=<?= (int) $memoire['idAM'] ?>" onclick="return confirm('Supprimer définitivement ce mémoire ?')">
-                                    <i class="fa-solid fa-trash"></i> Supprimer
-                                </a>
+                                <!-- Bouton intelligent à deux étapes (Copiez ceci dans vos colonnes d'action pour chaque mémoire) -->
+                                <button 
+                                    type="button"
+                                    class="btn-delete-inline"
+                                    data-url="supprimer_pubication.php?id=<?= $memoire['idAM'] ?>"
+                                    onclick="handleInlineDelete(this)"
+                                    style="background-color: #dc2626; color: white; border: none; padding: 8px 12px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: all 0.2s;"
+                                >
+                                    Supprimer
+                                </button>
+
+                                <script>
+                                function handleInlineDelete(btn) {
+                                    if (!btn.dataset.confirmed) {
+                                        // Premier clic : on passe en mode d'attente de confirmation
+                                        btn.dataset.confirmed = "true";
+                                        btn.style.backgroundColor = "#f59e0b"; // Orange ambré
+                                        btn.innerHTML = "⚠️ Confirmer ?";
+                                        
+                                        // Réinitialise le bouton après 4 secondes sans interaction
+                                        setTimeout(() => {
+                                            btn.removeAttribute('data-confirmed');
+                                            btn.style.backgroundColor = "#dc2626"; // Retour au rouge
+                                            btn.innerHTML = "Supprimer";
+                                        }, 4000);
+                                    } else {
+                                        // Deuxième clic validé : redirection directe vers l'action de suppression
+                                        window.location.href = btn.dataset.url;
+                                    }
+                                }
+                                </script>
                             </div>
                         </article>
                     <?php endwhile; ?>
