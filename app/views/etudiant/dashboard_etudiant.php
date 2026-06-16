@@ -40,7 +40,7 @@ $nb_deposes = (int) (mysqli_fetch_row(mysqli_stmt_get_result($deposes))[0] ?? 0)
             <h1>Bienvenue <?= htmlspecialchars($student['prenom'] ?? '', ENT_QUOTES, 'UTF-8') ?></h1>
             <p><?= htmlspecialchars($student['nom_filiere'] ?? 'Filière non définie', ENT_QUOTES, 'UTF-8') ?> · <?= $can_deposit ? 'Compte diplômé' : 'Compte consultaire' ?></p>
         </div>
-        <a class="btn-muted" href="../../../public/logout.php"><i class="fa-solid fa-right-from-bracket"></i> Déconnexion</a>
+        <a class="btn-muted" href="../../../app/views/auth/confirmation_logout.php"><i class="fa-solid fa-right-from-bracket"></i> Déconnexion</a>
     </header>
 
     <section class="cards-container">

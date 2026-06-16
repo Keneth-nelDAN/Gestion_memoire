@@ -25,7 +25,7 @@ if ($id > 0) {
         $nom_fichier = $memoire['fichier'];
         
         // Dossier exact de stockage des publications
-        $upload_dir = __DIR__ . '/uploads/memoires/';
+        $upload_dir = __DIR__ . '/../memoire/uploads/memoires/';
         $chemin_complet = rtrim($upload_dir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $nom_fichier;
 
         // Suppression sécurisée du fichier PDF physique sur l'espace de stockage

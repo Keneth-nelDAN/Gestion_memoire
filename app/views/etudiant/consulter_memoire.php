@@ -3,6 +3,11 @@ session_start();
 require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../config/mysqli_config.php';
 
+// Force l'affichage des erreurs pour voir immédiatement ce qui bloque si besoin
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
 if (empty($_SESSION['idetudiant'])) {
     header('Location: ../auth/connexion.php');
     exit;
@@ -11,7 +16,8 @@ if (empty($_SESSION['idetudiant'])) {
 $search = trim($_GET['q'] ?? '');
 $filiere_filter = trim($_GET['filiere'] ?? '');
 
-$where = "WHERE am.statut IN ('publie','publié','publiee','publiée')";
+// Gestion simplifiée et robuste du statut pour éviter les conflits d'accents
+$where = "WHERE (am.statut LIKE 'publi%' OR am.statut = 'publie')";
 $types = '';
 $params = [];
 
@@ -25,27 +31,39 @@ if ($search !== '') {
 }
 
 if ($filiere_filter !== '') {
+    // Utilisation de nom_filiere
     $where .= " AND f.nom_filiere = ?";
     $params[] = $filiere_filter;
     $types .= 's';
 }
 
+// Requête principale nettoyée avec nom_filiere
 $sql = "SELECT am.*, f.nom_filiere, CONCAT(am.prenomAut, ' ', am.nomAut) AS auteur,
-        (SELECT COUNT(*) FROM like_memoire lm WHERE lm.idAM = am.idAM OR lm.idmemoire = am.idAM) AS likes
+        (SELECT COUNT(*) FROM like_memoire lm WHERE lm.idAM = am.idAM) AS likes
     FROM ancien_memoire am
     LEFT JOIN filiere f ON f.idfiliere = am.idfiliere
     $where
     ORDER BY am.idAM DESC";
 
 $stmt = mysqli_prepare($conn, $sql);
-if ($stmt && $types !== '') {
+
+if (!$stmt) {
+    die("Erreur de préparation SQL (Requête principale) : " . mysqli_error($conn));
+}
+
+if ($types !== '') {
     mysqli_stmt_bind_param($stmt, $types, ...$params);
 }
+
 mysqli_stmt_execute($stmt);
 $memoires = mysqli_stmt_get_result($stmt);
 
-// Récupérer la liste des filières pour le menu déroulant
+// Liste des filières pour le menu déroulant avec nom_filiere
 $filieres_query = mysqli_query($conn, "SELECT DISTINCT nom_filiere FROM filiere WHERE nom_filiere IS NOT NULL ORDER BY nom_filiere ASC");
+
+if (!$filieres_query) {
+    die("Erreur de requête (Liste filières) : " . mysqli_error($conn));
+}
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -53,14 +71,12 @@ $filieres_query = mysqli_query($conn, "SELECT DISTINCT nom_filiere FROM filiere 
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GénieMémoire - Consultation des travaux</title>
-    <!-- Tailwind CSS pour un rendu esthétique instantané et robuste -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 </head>
 <body class="bg-slate-50 min-h-screen font-sans antialiased text-slate-800">
 
 <main class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-    <!-- Header de la Bibliothèque -->
     <header class="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-slate-200/60 mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
         <div class="space-y-2">
             <span class="inline-flex items-center px-3 py-1 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-full uppercase tracking-wider">
@@ -76,7 +92,6 @@ $filieres_query = mysqli_query($conn, "SELECT DISTINCT nom_filiere FROM filiere 
         </a>
     </header>
 
-    <!-- Conteneur Principal -->
     <section class="bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-slate-200/60 space-y-8">
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-6">
             <div>
@@ -85,9 +100,7 @@ $filieres_query = mysqli_query($conn, "SELECT DISTINCT nom_filiere FROM filiere 
             </div>
         </div>
 
-        <!-- Moteur de Recherche Multi-Critères -->
         <form class="bg-slate-50 rounded-2xl p-4 border border-slate-100 grid grid-cols-1 md:grid-cols-4 gap-4" method="get">
-            <!-- Recherche textuelle -->
             <div class="md:col-span-2 relative">
                 <input 
                     type="search" 
@@ -99,7 +112,6 @@ $filieres_query = mysqli_query($conn, "SELECT DISTINCT nom_filiere FROM filiere 
                 <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3.5 text-slate-400"></i>
             </div>
             
-            <!-- Choix filière -->
             <div>
                 <select 
                     name="filiere" 
@@ -116,7 +128,6 @@ $filieres_query = mysqli_query($conn, "SELECT DISTINCT nom_filiere FROM filiere 
                 </select>
             </div>
 
-            <!-- Soumission & Reset -->
             <div class="flex gap-2">
                 <button class="flex-1 inline-flex items-center justify-center px-4 py-3 bg-indigo-600 hover:bg-slate-900 text-white font-semibold text-sm rounded-xl transition-all shadow-sm gap-2" type="submit">
                     Filtrer
@@ -127,13 +138,11 @@ $filieres_query = mysqli_query($conn, "SELECT DISTINCT nom_filiere FROM filiere 
             </div>
         </form>
 
-        <!-- Grille des Mémoires -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <?php if ($memoires && mysqli_num_rows($memoires) > 0): ?>
                 <?php while ($memoire = mysqli_fetch_assoc($memoires)): ?>
                     <article class="bg-white rounded-2xl p-6 border border-slate-200 hover:border-indigo-500/30 hover:shadow-lg transition-all flex flex-col justify-between group">
                         <div class="space-y-4">
-                            <!-- Entête Card -->
                             <div class="flex items-center justify-between gap-2">
                                 <span class="bg-indigo-50 border border-indigo-100 text-indigo-700 text-[10px] font-extrabold px-2.5 py-1 rounded-md uppercase">
                                     <?= htmlspecialchars($memoire['nom_filiere'] ?: 'Générique', ENT_QUOTES, 'UTF-8') ?>
@@ -144,12 +153,10 @@ $filieres_query = mysqli_query($conn, "SELECT DISTINCT nom_filiere FROM filiere 
                                 </span>
                             </div>
 
-                            <!-- Thème / Titre -->
                             <h3 class="text-base font-bold text-slate-900 group-hover:text-indigo-600 transition-colors line-clamp-2 leading-snug">
                                 <?= htmlspecialchars($memoire['theme'], ENT_QUOTES, 'UTF-8') ?>
                             </h3>
 
-                            <!-- Métadonnées principales -->
                             <div class="space-y-2 pt-3 border-t border-slate-100 text-xs text-slate-600">
                                 <p class="flex items-center gap-2">
                                     <i class="fa-solid fa-user-graduate text-slate-400 w-4"></i>
@@ -166,21 +173,19 @@ $filieres_query = mysqli_query($conn, "SELECT DISTINCT nom_filiere FROM filiere 
                             </div>
                         </div>
 
-                        <!-- Bouton d'action sécurisé (Accrédite le 'idAM' de la BD) -->
                         <div class="pt-5 mt-5 border-t border-slate-100">
                             <a 
-                                href="view_pdf.php?id=<?= $memoire['idAM'] ?>" 
+                                href="../memoire/view_pdf.php?id=<?= $memoire['idAM'] ?>" 
                                 target="_blank" 
                                 class="w-full inline-flex items-center justify-center px-4 py-2.5 bg-slate-950 hover:bg-slate-900 group-hover:bg-indigo-600 text-white font-bold text-xs rounded-xl transition-all shadow-sm gap-2"
                             >
-                                <i class="fa-solid fa-eye-slash text-xs"></i> Lire en lecture sécurisée
+                                <i class="fa-solid fa-eye text-xs"></i> Lire en lecture sécurisée
                             </a>
                         </div>
                     </article>
                 <?php endwhile; ?>
             <?php else: ?>
-                <!-- Zone aucun résultat dans la grille -->
-                <div class="col-span-1 md:col-span-2 lg:col-span-3 bg-slate-50/50 rounded-2xl border-2 border-dashed border-slate-250 p-12 text-center max-w-md mx-auto">
+                <div class="col-span-1 md:col-span-2 lg:col-span-3 bg-slate-50/50 rounded-2xl border-2 border-dashed border-slate-200 p-12 text-center max-w-md mx-auto">
                     <div class="p-3 bg-white rounded-full shadow-sm max-w-max mx-auto mb-4 text-slate-400">
                         <i class="fa-solid fa-folder-open text-2xl"></i>
                     </div>

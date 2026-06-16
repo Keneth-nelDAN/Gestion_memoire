@@ -51,7 +51,7 @@ $initiales_de = $de_profile['initiales_de'] ?? 'DE';
 $idde = isset($_SESSION['idde']) ? (int) $_SESSION['idde'] : null;
 
 // Dossier exact défini par vos soins
-$upload_dir = __DIR__ . '/uploads/memoires/';
+$upload_dir = __DIR__ . '/../memoire/uploads/memoires/';
 $success = '';
 $error = '';
 

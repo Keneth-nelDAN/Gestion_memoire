@@ -129,7 +129,10 @@ class AuthController {
             $stmt->execute([':email' => $email]);
             $etudiant = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            if ($etudiant && $password === $etudiant['motdepasse']) {
+            $password = trim($password);
+            $storedPassword = trim((string) $etudiant['motdepasse']);
+            $passwordMatches = $etudiant && (password_verify($password, $storedPassword) || hash_equals($storedPassword, $password));
+            if ($passwordMatches) {
                 // Connexion réussie
                 return [
                     'success' => true,
@@ -158,30 +161,50 @@ class AuthController {
 
     private function loginProfesseur($email, $password) {
         try {
+            // Trim de sécurité pour éviter les espaces invisibles accidentels
+            $email = trim($email);
+            $password = trim($password);
+
             $query = 'SELECT * FROM professeur WHERE email = :email LIMIT 1';
             $stmt = $this->db->prepare($query);
             $stmt->execute([':email' => $email]);
             $professeur = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            if ($professeur && $password === $professeur['motdepasse']) {
-                // Connexion réussie
-                return [
-                    'success' => true,
-                    'message' => 'Connexion réussie',
-                    'user' => [
-                        'id' => $professeur['idprof'],
-                        'nom' => $professeur['nom'],
-                        'prenom' => $professeur['prenom'],
-                        'email' => $professeur['email'],
-                        'type' => 'professeur'
-                    ]
-                ];
-            } else {
-                return [
-                    'success' => false,
-                    'message' => 'Email ou mot de passe incorrect'
-                ];
+            // Vérifier d'abord si l'utilisateur existe
+            if ($professeur) {
+                $storedPassword = trim((string) $professeur['motdepasse']);
+
+                // Algorithmes supportés pour une compatibilité absolue avec votre base de données :
+                // 1. password_verify (Bcrypt d'origine)
+                // 2. hash_equals (Égalité stricte sécurisée pour texte brut)
+                // 3. md5 (Hachage très fréquent pour les professeurs dans phpMyAdmin)
+                // 4. sha1 (Autre cas de figure de hachage manuel fréquent)
+                $passwordMatches = password_verify($password, $storedPassword) || 
+                                   hash_equals($storedPassword, $password) ||
+                                   hash_equals($storedPassword, md5($password)) ||
+                                   hash_equals($storedPassword, sha1($password));
+
+                if ($passwordMatches) {
+                    // Connexion réussie
+                    return [
+                        'success' => true,
+                        'message' => 'Connexion réussie',
+                        'user' => [
+                            'id' => $professeur['idprof'],
+                            'nom' => $professeur['nom'],
+                            'prenom' => $professeur['prenom'],
+                            'email' => $professeur['email'],
+                            'type' => 'professeur'
+                        ]
+                    ];
+                }
             }
+
+            // Retourner l'erreur de connexion standard
+            return [
+                'success' => false,
+                'message' => 'Email ou mot de passe incorrect'
+            ];
         } catch (Exception $e) {
             return [
                 'success' => false,
@@ -189,7 +212,6 @@ class AuthController {
             ];
         }
     }
-
     private function loginDirecteur($email, $password) {
         try {
             $query = 'SELECT * FROM direction_etude WHERE email = :email LIMIT 1';
@@ -197,7 +219,10 @@ class AuthController {
             $stmt->execute([':email' => $email]);
             $directeur = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            if ($directeur && $password === $directeur['motdepasse']) {
+            $password = trim($password);
+            $storedPassword = trim((string) $directeur['motdepasse']);
+            $passwordMatches = $directeur && (password_verify($password, $storedPassword) || hash_equals($storedPassword, $password));
+            if ($passwordMatches) {
                 // Connexion réussie
                 return [
                     'success' => true,

@@ -1,21 +1,24 @@
 <?php
 session_start();
-require_once __DIR__ . '/../../../config/database.php';
-require_once __DIR__ . '/../../../config/mysqli_config.php';
+require_once __DIR__ . '/config/database.php';
+require_once __DIR__ . '/config/mysqli_config.php';
 
-// Barrière de sécurité : Seuls les utilisateurs connectés ont le droit de lire le flux binaire
-if (empty($_SESSION['idetudiant']) && empty($_SESSION['user_id']) && empty($_SESSION['id_user'])) {
+// Désactiver l'affichage des erreurs textuelles pour éviter de corrompre le PDF
+ini_set('display_errors', 0);
+error_reporting(0);
+
+// Barrière de sécurité
+if (empty($_SESSION['idetudiant']) && empty($_SESSION['idprof']) && empty($_SESSION['idde'])) {
     header("HTTP/1.1 403 Forbidden");
-    die("Accès refusé. Veuillez vous authentifier.");
+    exit("Accès refusé.");
 }
 
 $idAM = intval($_GET['id'] ?? 0);
 if ($idAM <= 0) {
     header("HTTP/1.1 404 Not Found");
-    die("Identifiant d'archive invalide.");
+    exit;
 }
 
-// Récupération de la référence binaire du fichier en base de données
 $fileDBName = "";
 $sql = "SELECT fichier FROM ancien_memoire WHERE idAM = ?";
 $stmt = mysqli_prepare($conn, $sql);
@@ -26,23 +29,25 @@ if ($stmt) {
     if ($row = mysqli_fetch_assoc($result)) {
         $fileDBName = $row['fichier'];
     }
+    mysqli_stmt_close($stmt);
 }
 
 if (empty($fileDBName)) {
     header("HTTP/1.1 404 Not Found");
-    die("Fichier introuvable en bdd.");
+    exit;
 }
 
-// Résolution intelligente du chemin réel du PDF (Direction des études)
+// CORRECTION DES CHEMINS : Vu que nous sommes à la racine du projet
 $possible_paths = [
-    __DIR__ . '/../direction_etude/uploads/memoires/' . $fileDBName,
-    __DIR__ . '/direction_etude/uploads/memoires/' . $fileDBName,
-    $_SERVER['DOCUMENT_ROOT'] . '/Gestion_memoire/app/views/direction_etude/uploads/memoires/' . $fileDBName
+    __DIR__ . '/app/views/direction_etude/uploads/memoires/' . $fileDBName,
+    __DIR__ . '/app/views/memoire/uploads/memoires/' . $fileDBName,
+    $_SERVER['DOCUMENT_ROOT'] . '/Gestion_memoire/app/views/direction_etude/uploads/memoires/' . $fileDBName,
+    $_SERVER['DOCUMENT_ROOT'] . '/Gestion_memoire/app/views/memoire/uploads/memoires/' . $fileDBName
 ];
 
 $filePath = "";
 foreach ($possible_paths as $path) {
-    if (file_exists($path) && is_file($path)) {
+    if (!empty($path) && file_exists($path) && is_file($path)) {
         $filePath = $path;
         break;
     }
@@ -50,10 +55,13 @@ foreach ($possible_paths as $path) {
 
 if (empty($filePath)) {
     header("HTTP/1.1 404 Not Found");
-    die("Le document physique n'existe pas sur le serveur.");
+    exit;
 }
 
-// Configuration des headers HTTP pour diffuser uniquement le flux brut compressé sans possibilité de mise en cache
+if (ob_get_length()) {
+    ob_end_clean();
+}
+
 header("Content-Type: application/pdf");
 header("Content-Disposition: inline; filename=\"" . basename($filePath) . "\"");
 header("Content-Length: " . filesize($filePath));
@@ -61,6 +69,5 @@ header("Cache-Control: no-cache, must-revalidate");
 header("Pragma: no-cache");
 header("Expires: 0");
 
-// Lecture directe et silencieuse du flux binaire
 readfile($filePath);
 exit;

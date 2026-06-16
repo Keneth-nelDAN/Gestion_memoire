@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 session_start();
 require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../config/mysqli_config.php';
@@ -69,7 +69,7 @@ $de_profile = get_de_profile($conn);
 $nom_de = $de_profile['nom_de'];
 $initiales_de = $de_profile['initiales_de'];
 $idde = isset($_SESSION['idde']) ? (int) $_SESSION['idde'] : null;
-$upload_dir = __DIR__ . 'Gestion_memoire/public/assets/uploads/memoires';
+$upload_dir = __DIR__ . '/../memoire/uploads/memoires/';
 $success = '';
 $error = '';
 

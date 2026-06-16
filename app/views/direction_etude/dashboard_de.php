@@ -328,20 +328,20 @@ if ($stmt) {
                             </div>
 
                             <div class="memoire-card-actions">
-                                <div class="pt-5 mt-5 border-t border-slate-100">
+                                <!-- <div class="pt-5 mt-5 border-t border-slate-100"> -->
                                     <a
-                                        href="view_pdf.php?id=<?= $memoire['idAM'] ?>"
+                                        href="/Gestion_memoire/app/views/memoire/view_pdf.php?id=<?= $memoire['idAM'] ?>"
                                         target="_blank"
                                         class="w-full inline-flex items-center justify-center px-4 py-2.5 bg-slate-950 hover:bg-slate-900 group-hover:bg-indigo-600 text-white font-bold text-xs rounded-xl transition-all shadow-sm gap-2"
-                                        style="background-color: #2563eb;"
+                                        style="background-color: #2563eb; border-radius: 8px; font-weight: bold; color: white; align-content: center; padding: 0 12px 0 12px;"
                                     >
                                         <i class="fa-solid fa-eye-slash text-xs"></i> Lire en lecture sécurisée
                                     </a>
-                                </div>
+                                <!-- </div> -->
                                 <a class="btn-blue" href="modifier_publication.php?id=<?= (int) $memoire['idAM'] ?>">
                                     <i class="fa-solid fa-pen-to-square"></i> Modifier
                                 </a>
-                                <!-- Bouton intelligent à deux étapes (Copiez ceci dans vos colonnes d'action pour chaque mémoire) -->
+                                <!-- Bouton intelligent à deux étapes -->
                                 <button 
                                     type="button"
                                     class="btn-delete-inline"

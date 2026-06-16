@@ -3,8 +3,7 @@ session_start();
 require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../config/mysqli_config.php';
 
-// Ajustement de la session pour accepter tous les types d'utilisateurs connectés
-if (empty($_SESSION['idetudiant']) && empty($_SESSION['user_id']) && empty($_SESSION['id_user'])) {
+if (empty($_SESSION['idetudiant']) && empty($_SESSION['idprof']) && empty($_SESSION['idde'])) {
     die("Accès refusé. Veuillez vous connecter pour consulter les mémoires de l'UATM GASA.");
 }
 
@@ -13,7 +12,6 @@ if ($idAM <= 0) {
     die("Identifiant de mémoire non spécifié ou invalide.");
 }
 
-// Récupération dynamique des méta-données dans la BD
 $theme = "Mémoire Académique";
 $auteur = "UATM GASA student";
 
@@ -32,8 +30,8 @@ if ($stmt) {
     }
 }
 
-// Point de sortie brute sécurisée
-$pdfUrl = "get_secure_stream.php?id=" . $idAM;
+// Remonte de 3 niveaux pour atteindre la racine où est stocké get_secure_stream.php
+$pdfUrl = "../../../get_secure_stream.php?id=" . $idAM;
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -44,7 +42,6 @@ $pdfUrl = "get_secure_stream.php?id=" . $idAM;
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     
-    <!-- PDF.js - Chargement stable -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
@@ -52,7 +49,6 @@ $pdfUrl = "get_secure_stream.php?id=" . $idAM;
 </head>
 <body class="bg-slate-900 min-h-screen text-white select-none relative overflow-x-hidden">
 
-    <!-- Header du Lecteur Sécurisé -->
     <header class="bg-slate-950/80 backdrop-blur-md border-b border-indigo-500/10 px-6 py-4 fixed top-0 left-0 w-full z-20 flex justify-between items-center">
         <div class="flex items-center space-x-3">
             <span class="p-2 bg-indigo-600 rounded-xl text-white">
@@ -70,19 +66,15 @@ $pdfUrl = "get_secure_stream.php?id=" . $idAM;
         </div>
     </header>
 
-    <!-- Zone de rendu des pages protégées -->
     <main class="pt-24 pb-12 flex flex-col items-center justify-center space-y-6">
-        <!-- Loader animé -->
         <div id="loading" class="text-center py-20 space-y-4">
             <div class="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-indigo-500"></div>
             <p class="text-sm text-slate-400">Chargement sécurisé du mémoire en cours...</p>
         </div>
 
-        <!-- Conteneur global ordonné des pages -->
         <div id="pdf-container" class="flex flex-col items-center gap-6"></div>
     </main>
 
-    <!-- Script de rendering ordonné et blindage contre le piratage -->
     <script>
         const pdfUrl = '<?= $pdfUrl ?>';
         const container = document.getElementById('pdf-container');
@@ -90,7 +82,6 @@ $pdfUrl = "get_secure_stream.php?id=" . $idAM;
         pdfjsLib.getDocument(pdfUrl).promise.then(function(pdf) {
             document.getElementById('loading').style.display = 'none';
 
-            // Pré-allocation ordonnée des balises de pages pour garantir l'ordre de lecture
             for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
                 const pageWrapper = document.createElement('div');
                 pageWrapper.className = 'relative bg-white shadow-2xl rounded-xl border border-slate-700 overflow-hidden my-4';
@@ -103,7 +94,6 @@ $pdfUrl = "get_secure_stream.php?id=" . $idAM;
                 canvas.id = 'canvas-page-' + pageNum;
                 pageWrapper.appendChild(canvas);
 
-                // Filigrane diagonal
                 const watermark = document.createElement('div');
                 watermark.className = 'absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden z-10';
                 watermark.innerHTML = `
@@ -126,7 +116,6 @@ $pdfUrl = "get_secure_stream.php?id=" . $idAM;
                 pageWrapper.appendChild(watermark);
                 container.appendChild(pageWrapper);
 
-                // Rendu asynchrone sécurisé de la page correspondante
                 pdf.getPage(pageNum).then(function(page) {
                     const canvasContext = canvas.getContext('2d');
                     const viewport = page.getViewport({ scale: 1.3 });
@@ -150,7 +139,6 @@ $pdfUrl = "get_secure_stream.php?id=" . $idAM;
             `;
         });
 
-        // 🛡️ ENTRAVES TECHNIQUES ANTIVOL
         document.addEventListener('contextmenu', e => e.preventDefault());
 
         document.addEventListener('keydown', function(e) {

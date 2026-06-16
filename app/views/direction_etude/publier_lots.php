@@ -53,7 +53,7 @@ $initiales_de = $de_profile['initiales_de'];
 $idde = isset($_SESSION['idde']) ? (int) $_SESSION['idde'] : null;
 
 // 2. CORRECTION : Remonter de 3 niveaux pour atteindre la racine puis cibler le dossier des mémoires
-$upload_dir = __DIR__ . '/../../../public/assets/uploads/memoires/';
+$upload_dir = __DIR__ . '/../memoire/uploads/memoires/';
 
 $success = '';
 $error = '';
