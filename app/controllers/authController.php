@@ -5,6 +5,46 @@ require_once __DIR__ . '/../../config/database.php';
 class AuthController {
     private $db;
 
+    // La méthode qui sera appelée par public/login.php
+    // Elle orchestre la connexion, la création de session et la réponse JSON.
+    public function processLogin() {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+
+        // 1. Récupérer les données du formulaire envoyées en POST
+        $userType = $_POST['userType'] ?? null;
+        $email = $_POST['email'] ?? null;
+        $password = $_POST['password'] ?? null;
+
+        // 2. Appeler la logique de validation de la connexion
+        $result = $this->login($userType, $email, $password);
+
+        // 3. Si la connexion est réussie, créer la session utilisateur
+        if ($result['success']) {
+            // Régénérer l'ID de session pour des raisons de sécurité
+            session_regenerate_id(true);
+
+            // Stocker les informations de l'utilisateur dans la session
+            $_SESSION['user'] = $result['user'];
+            $_SESSION['logged_in'] = true;
+            $_SESSION['userType'] = $result['user']['type'];
+            $_SESSION['nom'] = $result['user']['nom'];
+            $_SESSION['prenom'] = $result['user']['prenom'];
+            $_SESSION['email'] = $result['user']['email'];
+
+            // Stocker l'ID spécifique au rôle pour les vérifications d'accès
+            $user_id = $result['user']['id'];
+            if ($result['user']['type'] === 'etudiant') $_SESSION['idetudiant'] = $user_id;
+            if ($result['user']['type'] === 'professeur') $_SESSION['idprof'] = $user_id;
+            if ($result['user']['type'] === 'directeur') $_SESSION['idde'] = $user_id;
+        }
+
+        // 4. Renvoyer la réponse au format JSON au script JavaScript du client
+        header('Content-Type: application/json');
+        echo json_encode($result);
+    }
+
     public function __construct() {
         $database = new Database();
         $this->db = $database->connect();
@@ -173,19 +213,28 @@ class AuthController {
             // Vérifier d'abord si l'utilisateur existe
             if ($professeur) {
                 $storedPassword = trim((string) $professeur['motdepasse']);
+                $passwordMatches = false;
+                $needsRehash = false;
 
-                // Algorithmes supportés pour une compatibilité absolue avec votre base de données :
-                // 1. password_verify (Bcrypt d'origine)
-                // 2. hash_equals (Égalité stricte sécurisée pour texte brut)
-                // 3. md5 (Hachage très fréquent pour les professeurs dans phpMyAdmin)
-                // 4. sha1 (Autre cas de figure de hachage manuel fréquent)
-                $passwordMatches = password_verify($password, $storedPassword) || 
-                                   hash_equals($storedPassword, $password) ||
-                                   hash_equals($storedPassword, md5($password)) ||
-                                   hash_equals($storedPassword, sha1($password));
+                if (password_verify($password, $storedPassword)) {
+                    $passwordMatches = true;
+                    // Si le hachage n'est pas à jour avec les derniers algos/options, on le met à jour
+                    if (password_needs_rehash($storedPassword, PASSWORD_DEFAULT)) {
+                        $needsRehash = true;
+                    }
+                } elseif (hash_equals($storedPassword, $password) || hash_equals($storedPassword, md5($password)) || hash_equals($storedPassword, sha1($password))) {
+                    // Ancien mot de passe (texte brut, md5, sha1) - Connexion réussie, mais mise à jour nécessaire
+                    $passwordMatches = true;
+                    $needsRehash = true;
+                }
 
                 if ($passwordMatches) {
-                    // Connexion réussie
+                    // Si le mot de passe a besoin d'être mis à jour, on le fait maintenant.
+                    if ($needsRehash) {
+                        $newHash = password_hash($password, PASSWORD_DEFAULT);
+                        $rehash_stmt = $this->db->prepare('UPDATE professeur SET motdepasse = :motdepasse WHERE idprof = :idprof');
+                        $rehash_stmt->execute([':motdepasse' => $newHash, ':idprof' => $professeur['idprof']]);
+                    }
                     return [
                         'success' => true,
                         'message' => 'Connexion réussie',
@@ -208,7 +257,7 @@ class AuthController {
         } catch (Exception $e) {
             return [
                 'success' => false,
-                'message' => 'Erreur lors de la connexion : ' . $e->getMessage()
+                'message' => 'Erreur de connexion au serveur.' // Ne pas exposer les messages d'erreur détaillés
             ];
         }
     }
@@ -244,7 +293,7 @@ class AuthController {
         } catch (Exception $e) {
             return [
                 'success' => false,
-                'message' => 'Erreur lors de la connexion : ' . $e->getMessage()
+                'message' => 'Erreur de connexion au serveur.'
             ];
         }
     }
@@ -269,6 +318,7 @@ class AuthController {
                 ];
             }
 
+            $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
             $query = 'INSERT INTO etudiant (nom, prenom, idfiliere, niveau, email, motdepasse) VALUES (:nom, :prenom, :idfiliere, :niveau, :email, :motdepasse)';
             $stmt = $this->db->prepare($query);
             $stmt->execute([
@@ -277,7 +327,7 @@ class AuthController {
                 ':idfiliere' => $idfiliere,
                 ':niveau' => $niveau,
                 ':email' => $email,
-                ':motdepasse' => $password
+                ':motdepasse' => $hashedPassword
             ]);
 
             return [
@@ -287,7 +337,7 @@ class AuthController {
         } catch (Exception $e) {
             return [
                 'success' => false,
-                'message' => 'Erreur lors de l\'inscription : ' . $e->getMessage()
+                'message' => 'Erreur serveur lors de l\'inscription.'
             ];
         }
     }
@@ -304,13 +354,14 @@ class AuthController {
                 ];
             }
 
+            $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
             $query = 'INSERT INTO professeur (nom, prenom, email, motdepasse) VALUES (:nom, :prenom, :email, :motdepasse)';
             $stmt = $this->db->prepare($query);
             $stmt->execute([
                 ':nom' => $nom,
                 ':prenom' => $prenom,
                 ':email' => $email,
-                ':motdepasse' => $password
+                ':motdepasse' => $hashedPassword
             ]);
 
             return [
@@ -320,7 +371,7 @@ class AuthController {
         } catch (Exception $e) {
             return [
                 'success' => false,
-                'message' => 'Erreur lors de l\'inscription : ' . $e->getMessage()
+                'message' => 'Erreur serveur lors de l\'inscription.'
             ];
         }
     }
@@ -337,13 +388,14 @@ class AuthController {
                 ];
             }
 
+            $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
             $query = 'INSERT INTO direction_etude (nom, prenom, email, motdepasse) VALUES (:nom, :prenom, :email, :motdepasse)';
             $stmt = $this->db->prepare($query);
             $stmt->execute([
                 ':nom' => $nom,
                 ':prenom' => $prenom,
                 ':email' => $email,
-                ':motdepasse' => $password
+                ':motdepasse' => $hashedPassword
             ]);
 
             return [
@@ -353,7 +405,7 @@ class AuthController {
         } catch (Exception $e) {
             return [
                 'success' => false,
-                'message' => 'Erreur lors de l\'inscription : ' . $e->getMessage()
+                'message' => 'Erreur serveur lors de l\'inscription.'
             ];
         }
     }

@@ -88,7 +88,7 @@ if (isset($_POST['action']) && $_POST['action'] === 'confirm_logout') {
     session_destroy();
 
     // Redirection stricte et propre vers le point d'entrée de connexion
-    header("Location: connexion.php");
+    header("Location: /Gestion_memoire/app/views/auth/connexion.php");
     exit;
 }
 ?>

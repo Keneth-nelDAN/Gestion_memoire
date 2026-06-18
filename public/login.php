@@ -1,44 +1,25 @@
 <?php
-session_start();
-
 require_once __DIR__ . '/../app/controllers/authController.php';
 
-// Vérifier si le formulaire a été soumis
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $userType = $_POST['userType'] ?? null;
-    $email = $_POST['email'] ?? null;
-    $password = $_POST['password'] ?? null;
+/**
+ * Point d'entrée unique pour la gestion de l'authentification.
+ * Ce fichier agit comme un routeur simple pour les actions d'authentification.
+ */
 
-    // Créer une instance du contrôleur et valider la connexion
-    $authController = new AuthController();
-    $result = $authController->login($userType, $email, $password);
+// Initialise le contrôleur d'authentification
+$authController = new AuthController();
 
-    // Si la connexion est réussie, créer la session utilisateur
-    if ($result['success']) {
-        $_SESSION['user'] = $result['user'];
-        $_SESSION['logged_in'] = true;
-        
-        // Sauvegarder les IDs de session selon le type d'utilisateur
-        switch($result['user']['type']) {
-            case 'etudiant':
-                $_SESSION['idetudiant'] = $result['user']['id'];
-                break;
-            case 'professeur':
-                $_SESSION['idprof'] = $result['user']['id'];
-                break;
-            case 'directeur':
-                $_SESSION['idde'] = $result['user']['id'];
-                break;
+// Récupère l'action demandée (par exemple, 'login', 'logout')
+$action = $_GET['action'] ?? 'login';
+
+switch ($action) {
+    case 'login':
+        // Si la requête est POST, on traite la tentative de connexion
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $authController->processLogin();
         }
-        
-        // Régénérer l'ID de session après une connexion réussie
-        session_regenerate_id(true);
-    }
-    
-    // Répondre en JSON
-    header('Content-Type: application/json');
-    echo json_encode($result);
-    
-    exit;
+        break;
+    // D'autres cas comme 'logout' pourraient être ajoutés ici.
 }
-?>
+
+// Si aucune action n'est traitée, on ne fait rien.

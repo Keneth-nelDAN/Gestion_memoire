@@ -1,91 +1,23 @@
-﻿<?php
+﻿﻿<?php
 session_start();
-// 1. INCLUSIONS DES CONFIGURATIONS DE BASE ET MYSQLI (Résout le problème de $conn non définie)
-require_once __DIR__ . '/../../../config/database.php';
-require_once __DIR__ . '/../../../config/mysqli_config.php';
-require_once __DIR__ . '/de_helpers.php';
+require_once __DIR__ . '/../../../config/mysqli_config.php'; require_once __DIR__ . '/de_helpers.php';
 
-// Sécurité : Définition de la fonction d'échappement 'e' si elle n'existe pas
-if (!function_exists('e')) {
-    function e($string) {
-        return htmlspecialchars($string ?? '', ENT_QUOTES, 'UTF-8');
-    }
-}
-
-function upload_file_for_memoire($file, $upload_dir, &$error) {
-    if (!isset($file) || $file['error'] === UPLOAD_ERR_NO_FILE) {
-        $error = "Veuillez sélectionner un fichier.";
-        return false;
-    }
-    if ($file['error'] !== UPLOAD_ERR_OK) {
-        $error = "Erreur pendant l'envoi du fichier.";
-        return false;
-    }
-    if ($file['size'] > 12 * 1024 * 1024) {
-        $error = "Le fichier doit peser 12 Mo maximum.";
-        return false;
-    }
-    $finfo = finfo_open(FILEINFO_MIME_TYPE);
-    $mime = finfo_file($finfo, $file['tmp_name']);
-    finfo_close($finfo);
-    if ($mime !== 'application/pdf') {
-        $error = "Seuls les fichiers de type PDF sont autorisés.";
-        return false;
-    }
-    if (!is_dir($upload_dir)) {
-        mkdir($upload_dir, 0775, true);
-    }
-    $name = 'memoire_' . date('YmdHis') . '_' . bin2hex(random_bytes(4)) . '.pdf';
-    $destination = rtrim($upload_dir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $name;
-    if (!move_uploaded_file($file['tmp_name'], $destination)) {
-        $error = "Impossible d'enregistrer le fichier.";
-        return false;
-    }
-    return $name;
-}
+// Note: La logique de traitement du formulaire (POST) a été déplacée
+// vers un contrôleur pour respecter l'architecture MVC.
+// Ce fichier ne gère plus que l'affichage.
 
 $active_page = 'publication';
 $de_profile = get_de_profile($conn);
 $nom_de = $de_profile['nom_de'] ?? 'Direction';
 $initiales_de = $de_profile['initiales_de'] ?? 'DE';
-$idde = isset($_SESSION['idde']) ? (int) $_SESSION['idde'] : null;
-
-// Dossier exact défini par vos soins
-$upload_dir = __DIR__ . '/../memoire/uploads/memoires/';
-$success = '';
-$error = '';
 
 $filieres = mysqli_query($conn, "SELECT idfiliere, nom_filiere FROM filiere ORDER BY nom_filiere ASC");
 $centres = get_de_centres($conn);
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $nomAut = trim($_POST['nomAut'] ?? '');
-    $prenomAut = trim($_POST['prenomAut'] ?? '');
-    $theme = trim($_POST['theme'] ?? '');
-    $idfiliere = (int) ($_POST['idfiliere'] ?? 0);
-    $idCentre = ($_POST['idCentre'] ?? '') !== '' ? (int) $_POST['idCentre'] : null;
-    $annee = trim($_POST['annee_academique'] ?? '');
-    $maitre = trim($_POST['maitre_memoire'] ?? '');
-    $examinateur = trim($_POST['examinateur'] ?? '');
-    $president = trim($_POST['president_jury'] ?? '');
-    $statut = trim($_POST['statut'] ?? 'publie');
-    $source = 'de_unitaire';
-
-    if ($theme === '' || $nomAut === '' || $idfiliere <= 0) {
-        $error = "Veuillez renseigner au minimum le thème, l'auteur et la filière.";
-    } else {
-        $fichier = upload_file_for_memoire($_FILES['fichier'] ?? null, $upload_dir, $error);
-        if ($fichier !== false) {
-            $stmt = mysqli_prepare($conn, "INSERT INTO ancien_memoire (nomAut, prenomAut, theme, idfiliere, idCentre, annee_academique, maitre_memoire, examinateur, president_jury, fichier, statut, source, publie_par) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            mysqli_stmt_bind_param($stmt, 'sssiisssssssi', $nomAut, $prenomAut, $theme, $idfiliere, $idCentre, $annee, $maitre, $examinateur, $president, $fichier, $statut, $source, $idde);
-            if (mysqli_stmt_execute($stmt)) {
-                $success = "Le mémoire a été publié avec succès.";
-            } else {
-                $error = "Insertion impossible : " . mysqli_error($conn);
-            }
-        }
-    }
-}
+// Les variables $success et $error seraient passées par le contrôleur
+$success = $_SESSION['flash']['success'] ?? null;
+$error = $_SESSION['flash']['error'] ?? null;
+unset($_SESSION['flash']);
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -112,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <?php if ($success): ?><div class="alert success"><?= e($success) ?></div><?php endif; ?>
         <?php if ($error): ?><div class="alert error"><?= e($error) ?></div><?php endif; ?>
 
-        <form class="publication-card large" method="post" enctype="multipart/form-data">
+        <form class="publication-card large" action="/Gestion_memoire/public/publication/create" method="post" enctype="multipart/form-data">
             <div class="form-title">
                 <i class="fa-solid fa-file-circle-plus"></i>
                 <div>

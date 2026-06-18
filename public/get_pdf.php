@@ -29,7 +29,7 @@ if (!$memoire) {
     die("Fichier introuvable.");
 }
 
-$filepath = __DIR__ . "/uploads/" . $memoire['file_name'];
+$filepath = realpath(__DIR__ . "/../app/memoire/uploads/memoires/") . DIRECTORY_SEPARATOR . $memoire['file_name'];
 
 if (!file_exists($filepath)) {
     http_response_code(404);

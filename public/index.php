@@ -1,20 +1,48 @@
 <?php
-// 1. Inclure la configuration de la base de données et les modèles indispensables
-require_once "../config/database.php";
-require_once "../app/models/memoire.php"; 
+session_start();
+require_once __DIR__ . '/../app/controllers/publicationController.php';
+// Simple routeur pour diriger les requêtes
+$request_uri = $_SERVER['REQUEST_URI'];
+$base_path = '/Gestion_memoire/public';
 
-// 2. Instancier la base de données et créer la variable globale $pdo requise
-$database = new Database();
-$pdo = $database->connect();
+$route = str_replace($base_path, '', $request_uri);
+$route = strtok($route, '?'); // Enlever les query params
 
-if (!$pdo) {
-    die("Erreur critique : Impossible de se connecter à la base de données MySQL. Veuillez vérifier vos accès dans config/database.php.");
+// Parsing pour les routes avec des IDs (ex: /publication/delete/12)
+$parts = explode('/', trim($route, '/'));
+
+switch ($route) {
+    case '/':
+    case '/dashboard':
+        require_once __DIR__ . '/../app/controllers/dashboardController.php';
+        $controller = new dashboardController();
+        $controller->index();
+        break;
+
+    case '/login':
+        require_once __DIR__ . '/../app/views/auth/connexion.php';
+        break;
+
+    case '/publication/create':
+        $controller = new PublicationController();
+        $controller->create();
+        break;
+
+    case '/publication/create-batch':
+        $controller = new PublicationController();
+        $controller->createBatch();
+        break;
+
+    // Route pour la suppression: /publication/delete/ID
+    case (preg_match('/\/publication\/delete\/(\d+)/', $route, $matches) ? $route : false):
+        $id = (int)$matches[1];
+        $controller = new PublicationController();
+        $controller->delete($id);
+        break;
+
+    // Ajouter d'autres routes ici
+    default:
+        http_response_code(404);
+        echo "<h1>404 - Page non trouvée</h1>";
+        break;
 }
-
-// 3. Inclure le contrôleur du tableau de bord
-require_once "../app/controllers/dashboardController.php";
-
-// 4. Exécuter l'affichage du tableau de bord
-$controller = new dashboardController();
-$controller->index();
-?>

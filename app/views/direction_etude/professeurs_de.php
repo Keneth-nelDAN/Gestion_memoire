@@ -1,37 +1,30 @@
 <?php
 session_start();
-require_once __DIR__ . '/../../controllers/professeurController.php';
 require_once __DIR__ . '/de_helpers.php';
 
 // Vérifier que l'utilisateur est un directeur
 if (empty($_SESSION['idde']) && (empty($_SESSION['user']) || $_SESSION['user']['type'] !== 'directeur')) {
-    header('Location: ../auth/connexion.php');
+    header('Location: /Gestion_memoire/public/login.php');
     exit;
 }
 
+// La logique de traitement a été déplacée dans le contrôleur.
+// La vue se contente d'afficher les données.
+require_once __DIR__ . '/../../controllers/professeurController.php';
 $professeurController = new ProfesseurController();
 
 $active_page = 'professeurs';
-// get_de_profile uses mysqli
 require_once __DIR__ . '/../../../config/mysqli_config.php';
 $de_profile = get_de_profile($conn);
 $nom_de = $de_profile['nom_de'];
 $initiales_de = $de_profile['initiales_de'];
 
-$success = '';
-$error = '';
-$generated_password = '';
-$default_password = 'Prof@' . random_int(1000, 9999);
+$success = $_SESSION['flash']['success'] ?? null;
+$error = $_SESSION['flash']['error'] ?? null;
+$generated_password = $_SESSION['flash']['password'] ?? null;
+unset($_SESSION['flash']);
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $result = $professeurController->addProfesseur($_POST);
-    if ($result['success']) {
-        $success = 'Compte professeur créé avec succès. Le professeur peut maintenant se connecter avec son email et le mot de passe indiqué.';
-        $generated_password = $result['password'];
-    } else {
-        $error = $result['error'];
-    }
-}
+$default_password = 'Prof@' . random_int(1000, 9999);
 
 $professeurs = $professeurController->getAll();
 $nb_professeurs = count($professeurs);
@@ -68,7 +61,7 @@ $nb_professeurs = count($professeurs);
         <?php if ($error): ?><div class="alert error"><?= e($error) ?></div><?php endif; ?>
 
         <section class="professor-layout">
-            <form class="publication-card professor-form" method="post" autocomplete="off">
+            <form class="publication-card professor-form" action="/Gestion_memoire/public/professeur/create" method="post" autocomplete="off">
                 <div class="form-title">
                     <i class="fa-solid fa-user-check"></i>
                     <div>
