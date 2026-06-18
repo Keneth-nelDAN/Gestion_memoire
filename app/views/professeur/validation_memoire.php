@@ -3,8 +3,8 @@ session_start();
 
 define('SECURE_ACCESS', true);
 
-require_once __DIR__ . '/../../../config/database.php';
-require_once __DIR__ . '/../../../config/mysqli_config.php';
+require_once __DIR__ . '/../../controllers/juryController.php';
+require_once __DIR__ . '/../../controllers/professeurController.php';
 
 // Vérifier si l'utilisateur est connecté et est un professeur
 if (empty($_SESSION['user']) || $_SESSION['user']['type'] !== 'professeur') {
@@ -18,16 +18,11 @@ if (!$idprof) {
     exit;
 }
 
+$juryController = new JuryController();
+$professeurController = new ProfesseurController();
+
 // Récupérer les informations du professeur
-$professor = null;
-$stmt = mysqli_prepare($conn, "SELECT idprof, nom, prenom, email FROM professeur WHERE idprof = ? LIMIT 1");
-if ($stmt) {
-    mysqli_stmt_bind_param($stmt, 'i', $idprof);
-    mysqli_stmt_execute($stmt);
-    $result = mysqli_stmt_get_result($stmt);
-    $professor = mysqli_fetch_assoc($result);
-    mysqli_stmt_close($stmt);
-}
+$professor = $professeurController->getProfile($idprof);
 
 if (!$professor) {
     header('Location: ../auth/connexion.php');
@@ -36,9 +31,6 @@ if (!$professor) {
 
 $prenom = htmlspecialchars($professor['prenom'] ?? '', ENT_QUOTES, 'UTF-8');
 $nom = htmlspecialchars($professor['nom'] ?? '', ENT_QUOTES, 'UTF-8');
-$email = htmlspecialchars($professor['email'] ?? '', ENT_QUOTES, 'UTF-8');
-
-$email_escaped = mysqli_real_escape_string($conn, $email);
 
 $success_message = '';
 $error_message = '';
@@ -47,157 +39,28 @@ $error_message = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['id'])) {
     $memo_id = intval($_GET['id']);
     $note = floatval($_POST['note'] ?? 0);
-    $jury = trim($_POST['membres_jury'] ?? '');
+    $juryMembres = trim($_POST['membres_jury'] ?? '');
     $comments = trim($_POST['appreciations'] ?? '');
 
     if ($note < 0 || $note > 20) {
         $error_message = "La note saisie doit être comprise entre 0 et 20.";
     } else {
-        // Nettoyer pour la base de données
-        $jury_escaped = mysqli_real_escape_string($conn, $jury);
-        $comments_escaped = mysqli_real_escape_string($conn, $comments);
-
-        $updated_jury = false;
-
-        // 1. Essai de mise à jour de la table active JURY
-        $sql_jury = "UPDATE jury 
-                     SET decision = 'Confirmé (" . floatval($note) . "/20)', 
-                         observation = '$comments_escaped', 
-                         date_decision = NOW() 
-                     WHERE idmemoire = $memo_id AND idprof = $idprof";
-        $res_jury = mysqli_query($conn, $sql_jury);
-
-        if ($res_jury && mysqli_affected_rows($conn) > 0) {
-            // Également mettre à jour le statut du mémoire dans la table active `memoire`
-            $sql_memo = "UPDATE memoire 
-                         SET statut = 'valide' 
-                         WHERE idmemoire = $memo_id";
-            mysqli_query($conn, $sql_memo);
-            $updated_jury = true;
+        if ($juryController->validateThesis($memo_id, $idprof, $note, $juryMembres, $comments)) {
             $success_message = "L'évaluation finale de soutenance a été enregistrée avec succès ! Le mémoire de l'étudiant est validé et archivé.";
-        }
-
-        // 2. Fallback adaptatif sur la table `ancien_memoire`
-        if (!$updated_jury) {
-            // Si la table `ancien_memoire` est l'organe d'évaluation
-            $sql_status = "UPDATE `ancien_memoire` 
-                           SET statut = 'valide' 
-                           WHERE idAM = $memo_id";
-            $res_status = mysqli_query($conn, $sql_status);
-            
-            if ($res_status) {
-                $updated_jury = true;
-                $success_message = "L'évaluation de soutenance (ancien mémoire) a bien été enregistrée et le statut mis à jour à 'Validé'.";
-                
-                // Essai facultatif de mise à jour des commentaires si la colonne appreciations existe
-                $sql_extra = "UPDATE `ancien_memoire` 
-                              SET examinateur = 'Dr. Sévérin Kpovié',
-                                  president_jury = 'Dr. Marc GANDONOU'
-                              WHERE idAM = $memo_id";
-                @mysqli_query($conn, $sql_extra);
-            } else {
-                $error_message = "Erreur de base de données lors de la notation : " . mysqli_error($conn);
-            }
+        } else {
+            $error_message = "Erreur lors de la notation.";
         }
     }
 }
 
-// Récupérer la liste de tous les mémoires assignés en attente d'évaluation
-$jury_ok = false;
-$pending_memos = [];
+// Récupérer la liste des mémoires assignés
+$pending_memos = $juryController->getPendingMemoires($idprof);
 
-// 1. Charger les mémoires en attente d'évaluation depuis JURY (schéma actif)
-$pending_sql = "SELECT m.idmemoire AS id, m.theme AS theme, m.theme AS titre, 
-                       CONCAT(e.prenom, ' ', e.nom) AS etudiant, 
-                       CONCAT('GASA-', e.idetudiant) AS matricule,
-                       f.nom_filiere AS filiere, e.niveau AS niveau, 
-                       m.centre AS centre, m.annee_academique AS annee_acad, 
-                       '' AS superviseur, m.statut AS statut, 
-                       j.decision AS note, j.observation AS appreciations,
-                       j.role_jury AS jury_membres
-                FROM jury j
-                JOIN memoire m ON j.idmemoire = m.idmemoire
-                JOIN etudiant e ON m.idetudiant = e.idetudiant
-                LEFT JOIN filiere f ON m.idfiliere = f.idfiliere
-                WHERE j.idprof = $idprof AND (m.statut = 'en_attente' OR j.decision IS NULL OR j.decision = '')
-                ORDER BY m.idmemoire DESC";
-
-$pending_res = mysqli_query($conn, $pending_sql);
-if ($pending_res) {
-    while ($row = mysqli_fetch_assoc($pending_res)) {
-        $pending_memos[] = $row;
-    }
-    if (count($pending_memos) > 0) {
-        $jury_ok = true;
-    }
-}
-
-// Fallback sur `ancien_memoire`
-if (!$jury_ok) {
-    $pending_memos = [];
-    $pending_sql = "SELECT idAM AS id, theme AS theme, theme AS titre, 
-                           CONCAT(prenomAut, ' ', nomAut) AS etudiant, 
-                           '' AS matricule,
-                           (SELECT nom_filiere FROM filiere WHERE idfiliere = `ancien_memoire`.idfiliere LIMIT 1) AS filiere, 
-                           (SELECT nomNiveau FROM niveau WHERE idNiveau = `ancien_memoire`.idNiveau LIMIT 1) AS niveau, 
-                           maitre_memoire AS superviseur, annee_academique AS annee_acad, 
-                           statut, '' AS note, '' AS appreciations, 'Président/Examinateur' AS jury_membres 
-                    FROM `ancien_memoire` 
-                    WHERE (statut = 'en_attente' OR statut = 'sous_evaluation')
-                    AND (examinateur = '$email_escaped' OR president_jury = '$email_escaped') 
-                    ORDER BY idAM DESC";
-    $pending_res = mysqli_query($conn, $pending_sql);
-    if ($pending_res) {
-        while ($row = mysqli_fetch_assoc($pending_res)) {
-            $pending_memos[] = $row;
-        }
-    }
-}
-
-// Récupérer le mémoire actif sélectionné pour évaluation (si ?id=XX par exemple)
+// Récupérer le mémoire actif sélectionné pour évaluation
 $active_memo = null;
 if (isset($_GET['id'])) {
     $active_id = intval($_GET['id']);
-    $active_memo_ok = false;
-    
-    // Essai sur le schéma JURY actif
-    $active_sql = "SELECT m.idmemoire AS id, m.theme AS theme, m.theme AS titre, 
-                          CONCAT(e.prenom, ' ', e.nom) AS etudiant, 
-                          CONCAT('GASA-', e.idetudiant) AS matricule,
-                          f.nom_filiere AS filiere, e.niveau AS niveau, 
-                          m.centre AS centre, m.annee_academique AS annee_acad, 
-                          '' AS superviseur, m.statut AS statut, 
-                          j.decision AS note, j.observation AS appreciations,
-                          j.role_jury AS jury_membres
-                   FROM jury j
-                   JOIN memoire m ON j.idmemoire = m.idmemoire
-                   JOIN etudiant e ON m.idetudiant = e.idetudiant
-                   LEFT JOIN filiere f ON m.idfiliere = f.idfiliere
-                   WHERE m.idmemoire = $active_id AND j.idprof = $idprof 
-                   LIMIT 1";
-    $active_res = mysqli_query($conn, $active_sql);
-    if ($active_res && mysqli_num_rows($active_res) > 0) {
-        $active_memo = mysqli_fetch_assoc($active_res);
-        $active_memo_ok = true;
-    }
-    
-    // Fallback sur `ancien_memoire`
-    if (!$active_memo_ok) {
-        $active_sql = "SELECT idAM AS id, theme AS theme, theme AS titre, 
-                              CONCAT(prenomAut, ' ', nomAut) AS etudiant, 
-                              '' AS matricule,
-                              (SELECT nom_filiere FROM filiere WHERE idfiliere = `ancien_memoire`.idfiliere LIMIT 1) AS filiere, 
-                              (SELECT nomNiveau FROM niveau WHERE idNiveau = `ancien_memoire`.idNiveau LIMIT 1) AS niveau, 
-                              maitre_memoire AS superviseur, annee_academique AS annee_acad, 
-                              statut, '' AS note, '' AS appreciations, 'Président/Examinateur' AS jury_membres 
-                       FROM `ancien_memoire` 
-                       WHERE idAM = $active_id AND (examinateur = '$email_escaped' OR president_jury = '$email_escaped') 
-                       LIMIT 1";
-        $active_res = mysqli_query($conn, $active_sql);
-        if ($active_res && mysqli_num_rows($active_res) > 0) {
-            $active_memo = mysqli_fetch_assoc($active_res);
-        }
-    }
+    $active_memo = $juryController->getMemoireDetails($active_id, $idprof);
 }
 ?>
 <!DOCTYPE html>
@@ -550,7 +413,7 @@ if (isset($_GET['id'])) {
                                         <h4><?php echo htmlspecialchars($memo['titre']); ?></h4>
                                         <div class="d-flex flex-wrap align-items-center gap-2 justify-content-between text-xs text-muted" style="font-size: 11.5px;">
                                             <span><i class="fas fa-user-graduate me-1"></i> <?php echo htmlspecialchars($memo['etudiant']); ?></span>
-                                            <span class="badge bg-indigo-subtle text-indigo px-2 py-0.5 rounded"><?php echo htmlspecialchars($memo['niveau']); ?></span>
+                                            <span class="badge bg-indigo-subtle text-indigo px-2 py-0.5 rounded"><?php echo htmlspecialchars($memo['niveau'] ?? 'N/A'); ?></span>
                                         </div>
                                     </a>
                                 <?php endforeach; ?>
@@ -582,23 +445,23 @@ if (isset($_GET['id'])) {
                                 <div class="badge bg-amber-500 text-white font-bold uppercase tracking-wider text-[9px] mb-2">
                                     Licence / Master d'Ingénierie
                                 </div>
-                                <h4 class="font-bold text-sm text-slate-900 leading-snug mb-2"><?php echo htmlspecialchars($active_memo['titre']); ?></h4>
+                                <h4 class="font-bold text-sm text-slate-900 leading-snug mb-2"><?php echo htmlspecialchars($active_memo['theme']); ?></h4>
                                 <div class="row g-2 text-muted">
-                                    <div class="col-md-6"><strong>Étudiant :</strong> <?php echo htmlspecialchars($active_memo['etudiant']); ?> (<?php echo htmlspecialchars($active_memo['matricule'] ?? 'GASA-2026-X'); ?>)</div>
-                                    <div class="col-md-6"><strong>Directeur de thèse :</strong> <?php echo htmlspecialchars($active_memo['superviseur'] ?? 'N/A'); ?></div>
-                                    <div class="col-md-6 col-12"><strong>Niveau & Major :</strong> <?php echo htmlspecialchars($active_memo['filiere']); ?> (<?php echo htmlspecialchars($active_memo['niveau']); ?>)</div>
-                                    <div class="col-md-6 col-12"><strong>Année Académique :</strong> <?php echo htmlspecialchars($active_memo['annee_acad'] ?? '2024-2025'); ?></div>
+                                    <div class="col-md-6"><strong>Étudiant :</strong> <?php echo htmlspecialchars($active_memo['prenom_etudiant'] . " " . $active_memo['nom_etudiant']); ?> (<?php echo htmlspecialchars($active_memo['matricule'] ?? 'GASA-' . $active_memo['idetudiant']); ?>)</div>
+                                    <div class="col-md-6"><strong>Directeur de thèse :</strong> <?php echo htmlspecialchars($active_memo['maitre_memoire'] ?? 'N/A'); ?></div>
+                                    <div class="col-md-6 col-12"><strong>Filière & Niveau :</strong> <?php echo htmlspecialchars($active_memo['nom_filiere'] ?? 'N/A'); ?> (<?php echo htmlspecialchars($active_memo['niveau'] ?? 'N/A'); ?>)</div>
+                                    <div class="col-md-6 col-12"><strong>Année Académique :</strong> <?php echo htmlspecialchars($active_memo['annee_academique'] ?? 'N/A'); ?></div>
                                 </div>
                             </div>
 
                             <!-- Notation Form -->
-                            <form method="POST" action="validation_memoire.php?id=<?php echo $active_memo['id']; ?>" class="row g-3">
+                            <form method="POST" action="validation_memoire.php?id=<?php echo $active_memo['idmemoire']; ?>" class="row g-3">
                                 
                                 <!-- Mark field -->
                                 <div class="col-md-4">
                                     <label class="form-label form-label-custom">Note Finale (0-20) *</label>
                                     <div class="input-group">
-                                        <input type="number" required min="0" max="20" step="0.25" name="note" class="form-control form-control-custom font-bold text-slate-900" style="font-family: var(--font-display); font-size: 16px;" value="<?php echo isset($active_memo['note']) ? floatval($active_memo['note']) : ''; ?>" placeholder="Ex: 16.5">
+                                        <input type="number" required min="0" max="20" step="0.25" name="note" class="form-control form-control-custom font-bold text-slate-900" style="font-family: var(--font-display); font-size: 16px;" value="<?php echo isset($active_memo['note']) ? floatval(str_replace(['Confirmé (', '/20)'], '', $active_memo['note'])) : ''; ?>" placeholder="Ex: 16.5">
                                         <span class="input-group-text bg-white font-semibold text-muted">/ 20</span>
                                     </div>
                                     <p class="text-[10px] text-muted mt-1 leading-snug">Note de soutenance attribuée par délibération collective.</p>
@@ -607,7 +470,7 @@ if (isset($_GET['id'])) {
                                 <!-- Jury composition -->
                                 <div class="col-md-8">
                                     <label class="form-label form-label-custom">Membres du Jury d'Évaluation *</label>
-                                    <input type="text" name="membres_jury" class="form-control form-control-custom font-semibold text-slate-800" placeholder="Ex: Dr. Sévérin Kpovié (Président), Dr. Marc GANDONOU (Rapporteur)" value="<?php echo htmlspecialchars($active_memo['jury_membres'] ?? 'Dr. Sévérin Kpovié'); ?>">
+                                    <input type="text" name="membres_jury" class="form-control form-control-custom font-semibold text-slate-800" placeholder="Ex: Dr. Sévérin Kpovié (Président), Dr. Marc GANDONOU (Rapporteur)" value="<?php echo htmlspecialchars($active_memo['jury_membres'] ?? $nom . " " . $prenom); ?>">
                                     <p class="text-[10px] text-muted mt-1 leading-snug">Entrez les noms des examinateurs, séparés par des virgules.</p>
                                 </div>
 

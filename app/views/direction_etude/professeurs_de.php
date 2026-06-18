@@ -1,7 +1,6 @@
-﻿<?php
+<?php
 session_start();
-require_once __DIR__ . '/../../../config/database.php';
-require_once __DIR__ . '/../../../config/mysqli_config.php';
+require_once __DIR__ . '/../../controllers/professeurController.php';
 require_once __DIR__ . '/de_helpers.php';
 
 // Vérifier que l'utilisateur est un directeur
@@ -10,51 +9,32 @@ if (empty($_SESSION['idde']) && (empty($_SESSION['user']) || $_SESSION['user']['
     exit;
 }
 
+$professeurController = new ProfesseurController();
+
 $active_page = 'professeurs';
+// get_de_profile uses mysqli
+require_once __DIR__ . '/../../../config/mysqli_config.php';
 $de_profile = get_de_profile($conn);
 $nom_de = $de_profile['nom_de'];
 $initiales_de = $de_profile['initiales_de'];
+
 $success = '';
 $error = '';
 $generated_password = '';
 $default_password = 'Prof@' . random_int(1000, 9999);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $nom = trim($_POST['nom'] ?? '');
-    $prenom = trim($_POST['prenom'] ?? '');
-    $email = trim($_POST['email'] ?? '');
-    $motdepasse = trim($_POST['motdepasse'] ?? '');
-
-    if ($motdepasse === '') {
-        $motdepasse = $default_password;
-    }
-
-    if ($nom === '' || $prenom === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $error = 'Veuillez renseigner le nom, le prénom et un email valide.';
+    $result = $professeurController->addProfesseur($_POST);
+    if ($result['success']) {
+        $success = 'Compte professeur créé avec succès. Le professeur peut maintenant se connecter avec son email et le mot de passe indiqué.';
+        $generated_password = $result['password'];
     } else {
-        $check = mysqli_prepare($conn, 'SELECT idprof FROM professeur WHERE email = ? LIMIT 1');
-        mysqli_stmt_bind_param($check, 's', $email);
-        mysqli_stmt_execute($check);
-        $exists = mysqli_stmt_get_result($check);
-
-        if ($exists && mysqli_num_rows($exists) > 0) {
-            $error = 'Un professeur utilise déjà cet email.';
-        } else {
-            $stmt = mysqli_prepare($conn, 'INSERT INTO professeur (nom, prenom, email, motdepasse) VALUES (?, ?, ?, ?)');
-            mysqli_stmt_bind_param($stmt, 'ssss', $nom, $prenom, $email, $motdepasse);
-
-            if (mysqli_stmt_execute($stmt)) {
-                $generated_password = $motdepasse;
-                $success = 'Compte professeur créé avec succès. Le professeur peut maintenant se connecter avec son email et le mot de passe indiqué.';
-            } else {
-                $error = 'Impossible de créer le compte professeur.';
-            }
-        }
+        $error = $result['error'];
     }
 }
 
-$professeurs = mysqli_query($conn, 'SELECT idprof, nom, prenom, email FROM professeur ORDER BY idprof DESC');
-$nb_professeurs = $professeurs ? mysqli_num_rows($professeurs) : 0;
+$professeurs = $professeurController->getAll();
+$nb_professeurs = count($professeurs);
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -140,8 +120,8 @@ $nb_professeurs = $professeurs ? mysqli_num_rows($professeurs) : 0;
                 </div>
             </div>
             <div class="teacher-list">
-                <?php if ($professeurs && mysqli_num_rows($professeurs) > 0): ?>
-                    <?php mysqli_data_seek($professeurs, 0); while ($prof = mysqli_fetch_assoc($professeurs)): ?>
+                <?php if (!empty($professeurs)): ?>
+                    <?php foreach ($professeurs as $prof): ?>
                         <article class="teacher-item">
                             <div class="teacher-avatar"><?= e(strtoupper(substr($prof['prenom'], 0, 1) . substr($prof['nom'], 0, 1))) ?></div>
                             <div>
@@ -149,7 +129,7 @@ $nb_professeurs = $professeurs ? mysqli_num_rows($professeurs) : 0;
                                 <span><?= e($prof['email']) ?></span>
                             </div>
                         </article>
-                    <?php endwhile; ?>
+                    <?php endforeach; ?>
                 <?php else: ?>
                     <div class="empty-state">Aucun professeur ajouté pour le moment.</div>
                 <?php endif; ?>

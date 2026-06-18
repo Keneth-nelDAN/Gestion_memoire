@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Hôte : 127.0.0.1:3306
--- Généré le : ven. 29 mai 2026 à 12:30
+-- Généré le : mar. 02 juin 2026 à 13:08
 -- Version du serveur : 8.0.31
 -- Version de PHP : 8.0.26
 
@@ -13,7 +13,7 @@ SET time_zone = "+00:00";
 
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-sss/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
 /*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
 /*!40101 SET NAMES utf8mb4 */;
 
@@ -48,15 +48,14 @@ CREATE TABLE IF NOT EXISTS `ancien_memoire` (
   `publie_par` int DEFAULT NULL,
   PRIMARY KEY (`idAM`),
   KEY `idFiliere` (`idfiliere`)
-) ENGINE=MyISAM AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Déchargement des données de la table `ancien_memoire`
 --
 
 INSERT INTO `ancien_memoire` (`idAM`, `nomAut`, `prenomAut`, `theme`, `idfiliere`, `idNiveau`, `idCentre`, `annee_academique`, `maitre_memoire`, `examinateur`, `president_jury`, `fichier`, `statut`, `source`, `idetudiant`, `date_depot`, `publie_par`) VALUES
-(1, 'Dossou', 'Jean', 'Mise en place d un système de gestion scolaire intégré en milieu universitaire', 1, NULL, NULL, '2025-2026', 'Dr Fatou Anael', 'Dr Raff Jadj', 'Pr Oudza Paul', 'memoire.pdf', 'en_attente', NULL, NULL, '2026-05-29 14:21:05', NULL),
-(2, 'Fanou', 'Dieudonne', 'Conception d un site web institutionnel pour GASA FORMATION ', 4, NULL, NULL, '2024-2025', 'Dr Kossi Adonis', 'Dr Dossou Vladmir', 'Pr Aho Frédéric', 'memoire1.pdf', 'en_attente', NULL, NULL, '2026-05-29 14:21:05', NULL);
+(3, 'Sognon', 'Emile', 'Gestion d\'un restaurant', 4, NULL, NULL, '', 'Mr OLOUBO', 'JEAN', 'Mr SUZON', 'memoire_20260529183827_dfd7c850.pdf', 'publie', 'de_unitaire', NULL, '2026-05-29 20:38:27', NULL);
 
 -- --------------------------------------------------------
 
@@ -69,7 +68,7 @@ CREATE TABLE IF NOT EXISTS `centre` (
   `idCentre` int NOT NULL AUTO_INCREMENT,
   `nomCentre` varchar(100) NOT NULL,
   PRIMARY KEY (`idCentre`)
-) ENGINE=MyISAM AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Déchargement des données de la table `centre`
@@ -98,7 +97,7 @@ CREATE TABLE IF NOT EXISTS `commentaire` (
   PRIMARY KEY (`idcommentaire`),
   KEY `idmemoire` (`idmemoire`),
   KEY `idetudiant` (`idetudiant`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -115,7 +114,7 @@ CREATE TABLE IF NOT EXISTS `direction_etude` (
   `motdepasse` varchar(255) NOT NULL,
   PRIMARY KEY (`idde`),
   UNIQUE KEY `email` (`email`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -129,6 +128,8 @@ CREATE TABLE IF NOT EXISTS `etudiant` (
   `nom` varchar(100) NOT NULL,
   `prenom` varchar(100) NOT NULL,
   `idfiliere` int NOT NULL,
+  `idCentre` int DEFAULT NULL,
+  `idNiveau` int DEFAULT NULL,
   `niveau` varchar(20) NOT NULL,
   `email` varchar(150) NOT NULL,
   `motdepasse` varchar(255) NOT NULL,
@@ -137,16 +138,18 @@ CREATE TABLE IF NOT EXISTS `etudiant` (
   PRIMARY KEY (`idetudiant`),
   UNIQUE KEY `email` (`email`),
   KEY `idfiliere` (`idfiliere`)
-) ENGINE=MyISAM AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Déchargement des données de la table `etudiant`
 --
 
-INSERT INTO `etudiant` (`idetudiant`, `nom`, `prenom`, `idfiliere`, `niveau`, `email`, `motdepasse`, `type_compte`, `date_creation`) VALUES
-(1, 'Hounsou', 'Kossivi', 1, 'L3', 'kossivi@gmail.com', '123456', 'consultant', '2026-05-27 23:10:28'),
-(2, 'Diallo', 'Abibatou', 2, 'M2', 'abibatou@gmail.com', '123456', 'diplome', '2026-05-27 23:10:28'),
-(3, 'Agossou', 'Roméo', 3, 'L3', 'romeo@gmail.com', '123456', 'consultant', '2026-05-27 23:10:28');
+INSERT INTO `etudiant` (`idetudiant`, `nom`, `prenom`, `idfiliere`, `idCentre`, `idNiveau`, `niveau`, `email`, `motdepasse`, `type_compte`, `date_creation`) VALUES
+(1, 'Hounsou', 'Kossivi', 1, NULL, NULL, 'L3', 'kossivi@gmail.com', '123456', 'consultant', '2026-05-27 23:10:28'),
+(2, 'Diallo', 'Abibatou', 2, NULL, NULL, 'M2', 'abibatou@gmail.com', '123456', 'consultant', '2026-05-27 23:10:28'),
+(3, 'Agossou', 'Roméo', 3, NULL, NULL, 'L3', 'romeo@gmail.com', '123456', 'consultant', '2026-05-27 23:10:28'),
+(7, 'pascal', 'lokossou', 4, 1, 2, 'L2', 'pascallokossou31@gmail.com', 'Etud@537642', 'consultant', '2026-06-01 16:09:19'),
+(8, 'SOGNON', 'Emile', 4, 1, 3, 'L3', 'sognontossouemile@gmail.com', 'Etud@772434', 'diplome', '2026-06-01 16:40:49');
 
 -- --------------------------------------------------------
 
@@ -159,7 +162,7 @@ CREATE TABLE IF NOT EXISTS `filiere` (
   `idfiliere` int NOT NULL AUTO_INCREMENT,
   `nom_filiere` varchar(100) NOT NULL,
   PRIMARY KEY (`idfiliere`)
-) ENGINE=MyISAM AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Déchargement des données de la table `filiere`
@@ -195,7 +198,7 @@ CREATE TABLE IF NOT EXISTS `jury` (
   PRIMARY KEY (`idjury`),
   KEY `idmemoire` (`idmemoire`),
   KEY `idprof` (`idprof`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -212,7 +215,7 @@ CREATE TABLE IF NOT EXISTS `like_memoire` (
   PRIMARY KEY (`idlike`),
   KEY `idmemoire` (`idmemoire`),
   KEY `idetudiant` (`idetudiant`)
-) ENGINE=MyISAM AUTO_INCREMENT=31 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=31 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Déchargement des données de la table `like_memoire`
@@ -255,7 +258,18 @@ CREATE TABLE IF NOT EXISTS `niveau` (
   `idNiveau` int NOT NULL AUTO_INCREMENT,
   `nomNiveau` varchar(100) NOT NULL,
   PRIMARY KEY (`idNiveau`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Déchargement des données de la table `niveau`
+--
+
+INSERT INTO `niveau` (`idNiveau`, `nomNiveau`) VALUES
+(1, 'L1'),
+(2, 'L2'),
+(3, 'L3'),
+(4, 'M1'),
+(5, 'M2');
 
 -- --------------------------------------------------------
 
@@ -274,7 +288,7 @@ CREATE TABLE IF NOT EXISTS `notification` (
   PRIMARY KEY (`idnotification`),
   KEY `idetudiant` (`idetudiant`),
   KEY `idprof` (`idprof`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -291,7 +305,14 @@ CREATE TABLE IF NOT EXISTS `professeur` (
   `motdepasse` varchar(255) NOT NULL,
   PRIMARY KEY (`idprof`),
   UNIQUE KEY `email` (`email`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Déchargement des données de la table `professeur`
+--
+
+INSERT INTO `professeur` (`idprof`, `nom`, `prenom`, `email`, `motdepasse`) VALUES
+(1, 'ZINSOU', 'Moise', 'fofo@gamil.com', 'Prof@4395');
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

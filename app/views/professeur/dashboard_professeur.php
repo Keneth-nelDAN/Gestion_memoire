@@ -1,16 +1,12 @@
 <?php
 session_start();
 
-// Définir la constante pour sécuriser les fichiers inclus si nécessaire
 define('SECURE_ACCESS', true);
 
-// Configuration des fichiers de connexion de la base de données
-// Ajustez les chemins réels si votre structure diffère
-require_once __DIR__ . '/../../../config/database.php';
-require_once __DIR__ . '/../../../config/mysqli_config.php';
+require_once __DIR__ . '/../../controllers/professeurController.php';
 
 // Vérifier si l'utilisateur est connecté et est un professeur
-if (empty($_SESSION['user']) || ($_SESSION['user']['type'] !== 'professeur' && $_SESSION['user']['type'] !== 'professeur')) {
+if (empty($_SESSION['user']) || $_SESSION['user']['type'] !== 'professeur') {
     header('Location: ../auth/connexion.php');
     exit;
 }
@@ -21,21 +17,17 @@ if (!$idprof) {
     exit;
 }
 
-// Récupérer les informations détaillées du professeur - Colonnes garanties existantes
-$professor = null;
-$stmt_simple = mysqli_prepare($conn, "SELECT idprof, nom, prenom, email FROM professeur WHERE idprof = ? LIMIT 1");
-if ($stmt_simple) {
-    mysqli_stmt_bind_param($stmt_simple, 'i', $idprof);
-    mysqli_stmt_execute($stmt_simple);
-    $result_simple = mysqli_stmt_get_result($stmt_simple);
-    $professor = mysqli_fetch_assoc($result_simple);
-    mysqli_stmt_close($stmt_simple);
-}
+$professeurController = new ProfesseurController();
+$data = $professeurController->getDashboardData($idprof);
 
-if (!$professor) {
+if (!$data) {
     header('Location: ../auth/connexion.php');
     exit;
 }
+
+$professor = $data['professor'];
+$stats = $data['stats'];
+$recent_memos = $data['recent_memos'];
 
 $prenom = htmlspecialchars($professor['prenom'] ?? '', ENT_QUOTES, 'UTF-8');
 $nom = htmlspecialchars($professor['nom'] ?? '', ENT_QUOTES, 'UTF-8');
@@ -43,78 +35,9 @@ $email = htmlspecialchars($professor['email'] ?? '', ENT_QUOTES, 'UTF-8');
 $specialty = 'Enseignant-Chercheur';
 $department = 'DST (Sciences et Technologies)';
 
-// Éviter les injections SQL indirectes sur les données récupérées en base
-$email_escaped = mysqli_real_escape_string($conn, $email);
-
-// 1. Essai de récupération des statistiques depuis JURY et MEMOIRE (schéma actif)
-$jury_ok = false;
-$nb_evaluations = 0;
-$nb_a_valider = 0;
-$nb_valides = 0;
-$recent_memos = [];
-
-$res_total = mysqli_query($conn, "SELECT COUNT(*) FROM jury WHERE idprof = $idprof");
-if ($res_total) {
-    $jury_ok = true;
-    $nb_evaluations = mysqli_fetch_row($res_total)[0] ?? 0;
-    
-    $res_attente = mysqli_query($conn, "SELECT COUNT(*) FROM jury WHERE idprof = $idprof AND (decision IS NULL OR decision = '' OR decision = 'en_attente')");
-    $nb_a_valider = $res_attente ? (mysqli_fetch_row($res_attente)[0] ?? 0) : 0;
-    
-    $res_valide = mysqli_query($conn, "SELECT COUNT(*) FROM jury WHERE idprof = $idprof AND decision IS NOT NULL AND decision <> '' AND decision <> 'en_attente' AND decision <> 'refuse'");
-    $nb_valides = $res_valide ? (mysqli_fetch_row($res_valide)[0] ?? 0) : 0;
-    
-    // Récupérer les mémoires récents depuis le jury actif
-    $res_recent = mysqli_query($conn, "
-        SELECT m.idmemoire AS id, m.theme AS theme, m.theme AS titre, 
-               CONCAT(e.prenom, ' ', e.nom) AS etudiant, 
-               f.nom_filiere AS filiere, e.niveau AS niveau, m.statut AS statut, 
-               m.datesoumission AS date_depot, j.decision AS note
-        FROM jury j
-        JOIN memoire m ON j.idmemoire = m.idmemoire
-        JOIN etudiant e ON m.idetudiant = e.idetudiant
-        LEFT JOIN filiere f ON m.idfiliere = f.idfiliere
-        WHERE j.idprof = $idprof
-        ORDER BY m.idmemoire DESC LIMIT 5
-    ");
-    if ($res_recent) {
-        while ($row = mysqli_fetch_assoc($res_recent)) {
-            $recent_memos[] = $row;
-        }
-    }
-}
-
-// 2. Si non trouvé ou échec, fallback adaptatif sur la table `ancien_memoire`
-if (!$jury_ok || ($nb_evaluations == 0 && empty($recent_memos))) {
-    // Essai sur `ancien_memoire`
-    $res_total = mysqli_query($conn, "SELECT COUNT(*) FROM `ancien_memoire` WHERE examinateur = '$email_escaped' OR president_jury = '$email_escaped'");
-    if ($res_total) {
-        $nb_evaluations = mysqli_fetch_row($res_total)[0] ?? 0;
-        
-        $res_attente = mysqli_query($conn, "SELECT COUNT(*) FROM `ancien_memoire` WHERE statut = 'en_attente' AND (examinateur = '$email_escaped' OR president_jury = '$email_escaped')");
-        $nb_a_valider = $res_attente ? (mysqli_fetch_row($res_attente)[0] ?? 0) : 0;
-        
-        $res_valide = mysqli_query($conn, "SELECT COUNT(*) FROM `ancien_memoire` WHERE statut IN ('valide', 'publié', 'publie') AND (examinateur = '$email_escaped' OR president_jury = '$email_escaped')");
-        $nb_valides = $res_valide ? (mysqli_fetch_row($res_valide)[0] ?? 0) : 0;
-        
-        $res_recent = mysqli_query($conn, "
-            SELECT idAM AS id, theme AS theme, theme AS titre, 
-                   CONCAT(prenomAut, ' ', nomAut) AS etudiant, 
-                   (SELECT nom_filiere FROM filiere WHERE idfiliere = `ancien_memoire`.idfiliere LIMIT 1) AS filiere, 
-                   (SELECT nomNiveau FROM niveau WHERE idNiveau = `ancien_memoire`.idNiveau LIMIT 1) AS niveau, 
-                   statut, date_depot, '' AS note
-            FROM `ancien_memoire` 
-            WHERE examinateur = '$email_escaped' OR president_jury = '$email_escaped' 
-            ORDER BY idAM DESC LIMIT 5
-        ");
-        if ($res_recent) {
-            $recent_memos = [];
-            while ($row = mysqli_fetch_assoc($res_recent)) {
-                $recent_memos[] = $row;
-            }
-        }
-    }
-}
+$nb_evaluations = $stats['nb_evaluations'];
+$nb_a_valider = $stats['nb_a_valider'];
+$nb_valides = $stats['nb_valides'];
 ?>
 <!DOCTYPE html>
 <html lang="fr">

@@ -1,69 +1,27 @@
 <?php
 session_start();
-require_once __DIR__ . '/../../../config/database.php';
-require_once __DIR__ . '/../../../config/mysqli_config.php';
-
-// Force l'affichage des erreurs pour voir immédiatement ce qui bloque si besoin
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
+require_once __DIR__ . '/../../controllers/memoireController.php';
 
 if (empty($_SESSION['idetudiant'])) {
     header('Location: ../auth/connexion.php');
     exit;
 }
 
+$memoireController = new MemoireController();
+
 $search = trim($_GET['q'] ?? '');
 $filiere_filter = trim($_GET['filiere'] ?? '');
 
-// Gestion simplifiée et robuste du statut pour éviter les conflits d'accents
-$where = "WHERE (am.statut LIKE 'publi%' OR am.statut = 'publie')";
-$types = '';
-$params = [];
+$filters = [
+    'q' => $search,
+    'filiere' => $filiere_filter
+];
 
-if ($search !== '') {
-    $where .= " AND (am.theme LIKE ? OR am.nomAut LIKE ? OR am.prenomAut LIKE ?)";
-    $like = '%' . $search . '%';
-    $params[] = $like;
-    $params[] = $like;
-    $params[] = $like;
-    $types .= 'sss';
-}
+// On utilise search pour récupérer les mémoires publiés
+$data = $memoireController->index($filters);
+$memoires = $data['memoires'];
+$filieres = $data['filieres'];
 
-if ($filiere_filter !== '') {
-    // Utilisation de nom_filiere
-    $where .= " AND f.nom_filiere = ?";
-    $params[] = $filiere_filter;
-    $types .= 's';
-}
-
-// Requête principale nettoyée avec nom_filiere
-$sql = "SELECT am.*, f.nom_filiere, CONCAT(am.prenomAut, ' ', am.nomAut) AS auteur,
-        (SELECT COUNT(*) FROM like_memoire lm WHERE lm.idAM = am.idAM) AS likes
-    FROM ancien_memoire am
-    LEFT JOIN filiere f ON f.idfiliere = am.idfiliere
-    $where
-    ORDER BY am.idAM DESC";
-
-$stmt = mysqli_prepare($conn, $sql);
-
-if (!$stmt) {
-    die("Erreur de préparation SQL (Requête principale) : " . mysqli_error($conn));
-}
-
-if ($types !== '') {
-    mysqli_stmt_bind_param($stmt, $types, ...$params);
-}
-
-mysqli_stmt_execute($stmt);
-$memoires = mysqli_stmt_get_result($stmt);
-
-// Liste des filières pour le menu déroulant avec nom_filiere
-$filieres_query = mysqli_query($conn, "SELECT DISTINCT nom_filiere FROM filiere WHERE nom_filiere IS NOT NULL ORDER BY nom_filiere ASC");
-
-if (!$filieres_query) {
-    die("Erreur de requête (Liste filières) : " . mysqli_error($conn));
-}
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -118,13 +76,11 @@ if (!$filieres_query) {
                     class="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all font-semibold text-slate-700"
                 >
                     <option value="">Toutes les filières</option>
-                    <?php if ($filieres_query): ?>
-                        <?php while($f = mysqli_fetch_assoc($filieres_query)): ?>
-                            <option value="<?= htmlspecialchars($f['nom_filiere'], ENT_QUOTES, 'UTF-8') ?>" <?= $filiere_filter === $f['nom_filiere'] ? 'selected' : '' ?>>
-                                <?= htmlspecialchars($f['nom_filiere'], ENT_QUOTES, 'UTF-8') ?>
-                            </option>
-                        <?php endwhile; ?>
-                    <?php endif; ?>
+                    <?php foreach($filieres as $f): ?>
+                        <option value="<?= htmlspecialchars($f['nom_filiere'], ENT_QUOTES, 'UTF-8') ?>" <?= $filiere_filter === $f['nom_filiere'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($f['nom_filiere'], ENT_QUOTES, 'UTF-8') ?>
+                        </option>
+                    <?php endforeach; ?>
                 </select>
             </div>
 
@@ -139,8 +95,8 @@ if (!$filieres_query) {
         </form>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <?php if ($memoires && mysqli_num_rows($memoires) > 0): ?>
-                <?php while ($memoire = mysqli_fetch_assoc($memoires)): ?>
+            <?php if (!empty($memoires)): ?>
+                <?php foreach ($memoires as $memoire): ?>
                     <article class="bg-white rounded-2xl p-6 border border-slate-200 hover:border-indigo-500/30 hover:shadow-lg transition-all flex flex-col justify-between group">
                         <div class="space-y-4">
                             <div class="flex items-center justify-between gap-2">
@@ -183,7 +139,7 @@ if (!$filieres_query) {
                             </a>
                         </div>
                     </article>
-                <?php endwhile; ?>
+                <?php endforeach; ?>
             <?php else: ?>
                 <div class="col-span-1 md:col-span-2 lg:col-span-3 bg-slate-50/50 rounded-2xl border-2 border-dashed border-slate-200 p-12 text-center max-w-md mx-auto">
                     <div class="p-3 bg-white rounded-full shadow-sm max-w-max mx-auto mb-4 text-slate-400">

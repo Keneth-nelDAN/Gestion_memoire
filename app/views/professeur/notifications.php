@@ -3,8 +3,8 @@ session_start();
 
 define('SECURE_ACCESS', true);
 
-require_once __DIR__ . '/../../../config/database.php';
-require_once __DIR__ . '/../../../config/mysqli_config.php';
+require_once __DIR__ . '/../../controllers/notificationController.php';
+require_once __DIR__ . '/../../controllers/professeurController.php';
 
 // Vérifier si l'utilisateur est connecté et est un professeur
 if (empty($_SESSION['user']) || $_SESSION['user']['type'] !== 'professeur') {
@@ -18,16 +18,11 @@ if (!$idprof) {
     exit;
 }
 
+$notificationController = new NotificationController();
+$professeurController = new ProfesseurController();
+
 // Récupérer les informations du professeur
-$professor = null;
-$stmt = mysqli_prepare($conn, "SELECT idprof, nom, prenom, email FROM professeur WHERE idprof = ? LIMIT 1");
-if ($stmt) {
-    mysqli_stmt_bind_param($stmt, 'i', $idprof);
-    mysqli_stmt_execute($stmt);
-    $result = mysqli_stmt_get_result($stmt);
-    $professor = mysqli_fetch_assoc($result);
-    mysqli_stmt_close($stmt);
-}
+$professor = $professeurController->getProfile($idprof);
 
 if (!$professor) {
     header('Location: ../auth/connexion.php');
@@ -37,68 +32,19 @@ if (!$professor) {
 $prenom = htmlspecialchars($professor['prenom'] ?? '', ENT_QUOTES, 'UTF-8');
 $nom = htmlspecialchars($professor['nom'] ?? '', ENT_QUOTES, 'UTF-8');
 
-// Charger les alertes réelles de la base de données
-$db_notifs = [];
-$res_notif = mysqli_query($conn, "
-    SELECT idnotification AS id, message, statut_lecture AS `read`, date_notification AS `time`
-    FROM notification 
-    WHERE idprof = $idprof 
-    ORDER BY idnotification DESC 
-    LIMIT 20
-");
-
-if ($res_notif && mysqli_num_rows($res_notif) > 0) {
-    while ($row = mysqli_fetch_assoc($res_notif)) {
-        $db_notifs[] = [
-            'id' => intval($row['id']),
-            'type' => intval($row['read']) === 0 ? 'deposit' : 'system',
-            'title' => 'Notification Académique',
-            'message' => htmlspecialchars($row['message'], ENT_QUOTES, 'UTF-8'),
-            'time' => date('d/m/Y H:i', strtotime($row['time'])),
-            'read' => intval($row['read']) === 1
-        ];
-    }
+// Gérer le marquage comme lu
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'mark_read') {
+    $notificationController->markAllAsReadForProfesseur($idprof);
 }
 
-// Corpus statique réaliste d'alertes académiques pour simuler le registre si non stocké en BDD
-$mock_notifications = [
-    [
-        'id' => 1001,
-        'type' => 'deposit',
-        'title' => 'Nouveau Dépôt de Mémoire',
-        'message' => "L'étudiant Aurel KPONOU a déposé son mémoire de fin d'étude : \"Mise en place d'un modèle d'Intelligence Artificielle pour la détection précoce du paludisme basé sur l'analyse sanguine\" (M2, Génie Logiciel) pour examen.",
-        'time' => 'Il y a 3 heures',
-        'read' => false
-    ],
-    [
-        'id' => 1002,
-        'type' => 'jury',
-        'title' => 'Désignation de Soutenance',
-        'message' => 'Vous avez été assigné comme Président de Jury de soutenance pour l\'étudiante Yasmine AGOSSOU : "Sécurisation et optimisation de la bande passante par pfSense".',
-        'time' => 'Hier',
-        'read' => false
-    ],
-    [
-        'id' => 1003,
-        'type' => 'publication',
-        'title' => 'Rapport publié en ligne',
-        'message' => 'Le mémoire de Keneth nelDAN sur la plateforme "GASA-Archive" a été officiellement approuvé par la Direction des Etudes puis publié.',
-        'time' => 'Il y a 2 jours',
-        'read' => true
-    ],
-    [
-        'id' => 1004,
-        'type' => 'system',
-        'title' => 'Guide d\'évaluation GASA',
-        'message' => 'La grille officielle des coefficients et des mentions de soutenance de l\'UATM GASA Formation a été mise à jour pour l\'année académique 2025-2026.',
-        'time' => 'Il y a 1 semaine',
-        'read' => true
-    ]
-];
+// Charger les alertes via le contrôleur
+$notifications = $notificationController->getProfesseurNotifications($idprof);
 
-// Fusionner les notifications (BDD d'abord, suivies des mock si aucune BDD n'existe ou pour enrichir)
-if (!empty($db_notifs)) {
-    $mock_notifications = array_merge($db_notifs, $mock_notifications);
+$unread_count = 0;
+foreach ($notifications as $n) {
+    if (!$n['read']) {
+        $unread_count++;
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -407,53 +353,53 @@ if (!empty($db_notifs)) {
                     <h1>Registre des Alertes Académiques</h1>
                     <p>Liste des dépôts d'étudiants, publications et communiqués administratifs récents.</p>
                 </div>
-                <button class="btn btn-sm btn-outline-secondary" onclick="alert('Toutes les alertes ont été marquées comme lues.')" style="border-radius: 8px; font-weight: 600;">
-                    <i class="fas fa-check-double me-1"></i> Tout marquer comme lu
-                </button>
+                <?php if ($unread_count > 0): ?>
+                    <form method="POST">
+                        <input type="hidden" name="action" value="mark_read">
+                        <button class="btn btn-sm btn-outline-secondary" type="submit" style="border-radius: 8px; font-weight: 600;">
+                            <i class="fas fa-check-double me-1"></i> Tout marquer comme lu
+                        </button>
+                    </form>
+                <?php endif; ?>
             </div>
 
             <div class="section-card">
                 <div class="notif-feed">
-                    <?php foreach ($mock_notifications as $notif): ?>
-                        <div class="notif-item <?php echo !$notif['read'] ? 'notif-unread' : ''; ?>">
-                            <div class="notif-icon-box icon-<?php echo $notif['type']; ?>">
-                                <?php if ($notif['type'] === 'deposit'): ?>
-                                    <i class="fas fa-file-upload"></i>
-                                <?php elseif ($notif['type'] === 'jury'): ?>
-                                    <i class="fas fa-award"></i>
-                                <?php elseif ($notif['type'] === 'publication'): ?>
-                                    <i class="fas fa-globe"></i>
-                                <?php else: ?>
-                                    <i class="fas fa-info-circle"></i>
-                                <?php endif; ?>
-                            </div>
-                            
-                            <div class="flex-1">
-                                <h4>
-                                    <span><?php echo htmlspecialchars($notif['title']); ?></span>
-                                    <?php if (!$notif['read']): ?>
-                                        <span class="notif-badge-unread">Nouveau</span>
+                    <?php if (!empty($notifications)): ?>
+                        <?php foreach ($notifications as $notif): ?>
+                            <div class="notif-item <?php echo !$notif['read'] ? 'notif-unread' : ''; ?>">
+                                <div class="notif-icon-box icon-<?php echo $notif['type']; ?>">
+                                    <?php if ($notif['type'] === 'deposit'): ?>
+                                        <i class="fas fa-file-upload"></i>
+                                    <?php elseif ($notif['type'] === 'jury'): ?>
+                                        <i class="fas fa-award"></i>
+                                    <?php elseif ($notif['type'] === 'publication'): ?>
+                                        <i class="fas fa-globe"></i>
+                                    <?php else: ?>
+                                        <i class="fas fa-info-circle"></i>
                                     <?php endif; ?>
-                                </h4>
-                                <p><?php echo htmlspecialchars($notif['message']); ?></p>
-                                <div class="d-flex align-items-center justify-content-between text-xs text-muted">
-                                    <span class="notif-meta"><i class="far fa-clock me-1"></i> <?php echo htmlspecialchars($notif['time']); ?></span>
-                                    
-                                    <div class="d-flex align-items-center gap-2">
+                                </div>
+                                
+                                <div class="flex-1">
+                                    <h4>
+                                        <span><?php echo htmlspecialchars($notif['title']); ?></span>
                                         <?php if (!$notif['read']): ?>
-                                            <button onclick="alert('Alerte traitée.')" class="btn btn-xs btn-link text-decoration-none text-primary p-0 text-[11px] font-semibold">
-                                                Marquer comme lu
-                                            </button>
-                                            <span class="text-slate-300">|</span>
+                                            <span class="notif-badge-unread">Nouveau</span>
                                         <?php endif; ?>
-                                        <button onclick="this.closest('.notif-item').remove()" class="btn btn-xs btn-link text-decoration-none text-danger p-0 text-[11px] font-semibold">
-                                            Masquer
-                                        </button>
+                                    </h4>
+                                    <p><?php echo $notif['message']; ?></p>
+                                    <div class="d-flex align-items-center justify-content-between text-xs text-muted">
+                                        <span class="notif-meta"><i class="far fa-clock me-1"></i> <?php echo htmlspecialchars($notif['time']); ?></span>
                                     </div>
                                 </div>
                             </div>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <div class="text-center py-5">
+                            <i class="fas fa-bell-slash fa-3x text-muted mb-3"></i>
+                            <p class="text-muted">Aucune notification pour le moment.</p>
                         </div>
-                    <?php endforeach; ?>
+                    <?php endif; ?>
                 </div>
             </div>
 

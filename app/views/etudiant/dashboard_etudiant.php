@@ -1,7 +1,6 @@
 <?php
 session_start();
-require_once __DIR__ . '/../../../config/database.php';
-require_once __DIR__ . '/../../../config/mysqli_config.php';
+require_once __DIR__ . '/../../controllers/etudiantController.php';
 
 if (empty($_SESSION['idetudiant'])) {
     header('Location: ../auth/connexion.php');
@@ -9,19 +8,15 @@ if (empty($_SESSION['idetudiant'])) {
 }
 
 $idetudiant = (int) $_SESSION['idetudiant'];
-$stmt = mysqli_prepare($conn, "SELECT e.*, f.nom_filiere FROM etudiant e LEFT JOIN filiere f ON f.idfiliere = e.idfiliere WHERE e.idetudiant = ? LIMIT 1");
-mysqli_stmt_bind_param($stmt, 'i', $idetudiant);
-mysqli_stmt_execute($stmt);
-$student = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
+$etudiantController = new EtudiantController();
+
+$data = $etudiantController->getDashboardData($idetudiant);
+$student = $data['student'];
+$nb_memoires = $data['nb_memoires'];
+$nb_deposes = $data['nb_deposes'];
+
 $type_compte = $student['type_compte'] ?? 'consultant';
 $can_deposit = $type_compte === 'diplome';
-
-$memoires = mysqli_query($conn, "SELECT COUNT(*) FROM ancien_memoire WHERE statut IN ('publie','publié','publiee','publiée')");
-$deposes = mysqli_prepare($conn, "SELECT COUNT(*) FROM ancien_memoire WHERE idetudiant = ?");
-mysqli_stmt_bind_param($deposes, 'i', $idetudiant);
-mysqli_stmt_execute($deposes);
-$nb_memoires = (int) (mysqli_fetch_row($memoires)[0] ?? 0);
-$nb_deposes = (int) (mysqli_fetch_row(mysqli_stmt_get_result($deposes))[0] ?? 0);
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -60,6 +55,7 @@ $nb_deposes = (int) (mysqli_fetch_row(mysqli_stmt_get_result($deposes))[0] ?? 0)
 
     <section class="quick-actions">
         <a href="consulter_memoire.php"><i class="fa-solid fa-book-open-reader"></i><span>Consulter les mémoires</span></a>
+        <a href="notifications.php"><i class="fa-solid fa-bell"></i><span>Mes Notifications</span></a>
         <?php if ($can_deposit): ?>
             <a href="depot_memoire.php"><i class="fa-solid fa-file-circle-plus"></i><span>Déposer mon mémoire</span></a>
         <?php endif; ?>

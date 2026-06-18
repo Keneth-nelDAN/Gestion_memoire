@@ -1,10 +1,18 @@
-﻿<?php
+<?php
 session_start();
-require_once __DIR__ . '/../../../config/database.php';
-require_once __DIR__ . '/../../../config/mysqli_config.php';
+require_once __DIR__ . '/../../controllers/etudiantController.php';
 
 if (empty($_SESSION['idetudiant'])) {
     header('Location: ../auth/connexion.php');
+    exit;
+}
+
+$etudiantController = new EtudiantController();
+$idetudiant = (int) $_SESSION['idetudiant'];
+$student = $etudiantController->getProfile($idetudiant);
+
+if (!$student || (($student['type_compte'] ?? 'consultant') !== 'diplome')) {
+    header('Location: dashboard_etudiant.php');
     exit;
 }
 
@@ -12,140 +20,23 @@ function e($value) {
     return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
 }
 
-function column_exists($conn, $table, $column) {
-    $stmt = mysqli_prepare($conn, 'SELECT COUNT(*) AS total FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?');
-    mysqli_stmt_bind_param($stmt, 'ss', $table, $column);
-    mysqli_stmt_execute($stmt);
-    $row = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
-    return !empty($row['total']);
-}
-
-function bind_dynamic($stmt, $types, &$params) {
-    $refs = [];
-    foreach ($params as $key => $value) {
-        $refs[$key] = &$params[$key];
-    }
-    return mysqli_stmt_bind_param($stmt, $types, ...$refs);
-}
-
-function professor_name_by_id($conn, $idprof) {
-    $stmt = mysqli_prepare($conn, 'SELECT nom, prenom FROM professeur WHERE idprof = ? LIMIT 1');
-    mysqli_stmt_bind_param($stmt, 'i', $idprof);
-    mysqli_stmt_execute($stmt);
-    $row = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
-    return $row ? trim($row['prenom'] . ' ' . $row['nom']) : '';
-}
-
-function notify_professor($conn, $idprof, $message) {
-    $stmt = mysqli_prepare($conn, 'INSERT INTO notification (message, statut_lecture, date_notification, idprof) VALUES (?, 0, CURRENT_TIMESTAMP, ?)');
-    if ($stmt) {
-        mysqli_stmt_bind_param($stmt, 'si', $message, $idprof);
-        mysqli_stmt_execute($stmt);
-    }
-}
-
-$idetudiant = (int) $_SESSION['idetudiant'];
-$student_stmt = mysqli_prepare($conn, 'SELECT * FROM etudiant WHERE idetudiant = ? LIMIT 1');
-mysqli_stmt_bind_param($student_stmt, 'i', $idetudiant);
-mysqli_stmt_execute($student_stmt);
-$student = mysqli_fetch_assoc(mysqli_stmt_get_result($student_stmt));
-
-if (!$student || (($student['type_compte'] ?? 'consultant') !== 'diplome')) {
-    header('Location: dashboard_etudiant.php');
-    exit;
-}
-
 $success = '';
 $error = '';
-$upload_dir = __DIR__ . '/../memoire/uploads/memoires/';
-$filieres = mysqli_query($conn, "SELECT idfiliere, nom_filiere FROM filiere ORDER BY nom_filiere ASC");
-$centres = mysqli_query($conn, "SELECT idCentre, nomCentre FROM centre ORDER BY FIELD(nomCentre, 'Agla', 'Akpakpa', 'Gbegamey', 'Calavi', 'Porto-novo'), nomCentre");
-$professeurs_result = mysqli_query($conn, "SELECT idprof, nom, prenom, email FROM professeur ORDER BY prenom ASC, nom ASC");
-$professeurs = $professeurs_result ? mysqli_fetch_all($professeurs_result, MYSQLI_ASSOC) : [];
-$annee_default = date('Y') . '-' . (date('Y') + 1);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $theme = trim($_POST['theme'] ?? '');
-    $idfiliere = (int) ($_POST['idfiliere'] ?? $student['idfiliere']);
-    $idCentre = ($_POST['idCentre'] ?? '') !== '' ? (int) $_POST['idCentre'] : null;
-    $annee = trim($_POST['annee_academique'] ?? '');
-    $date_soutenance = trim($_POST['date_soutenance'] ?? '');
-    $mots_cles = trim($_POST['mots_cles'] ?? '');
-    $id_maitre = (int) ($_POST['maitre_memoire'] ?? 0);
-    $id_examinateur = (int) ($_POST['examinateur'] ?? 0);
-    $id_president = (int) ($_POST['president_jury'] ?? 0);
-    $maitre = professor_name_by_id($conn, $id_maitre);
-    $examinateur = professor_name_by_id($conn, $id_examinateur);
-    $president = professor_name_by_id($conn, $id_president);
-
-    if ($theme === '' || $idfiliere <= 0 || $idCentre === null || $annee === '' || $id_maitre <= 0 || $id_examinateur <= 0 || $id_president <= 0 || $maitre === '' || $examinateur === '' || $president === '') {
-        $error = 'Veuillez renseigner toutes les informations obligatoires.';
-    } elseif (empty($_FILES['fichier']['name']) || $_FILES['fichier']['error'] !== UPLOAD_ERR_OK) {
-        $error = 'Veuillez sélectionner un fichier.';
-    } elseif ($_FILES['fichier']['size'] > 50 * 1024 * 1024) {
-        $error = 'Le fichier doit peser 50 Mo maximum.';
+    $result = $etudiantController->handleDeposer();
+    if (isset($result['success'])) {
+        $success = $result['success'];
     } else {
-        $finfo = finfo_open(FILEINFO_MIME_TYPE);
-        $mime = finfo_file($finfo, $_FILES['fichier']['tmp_name']);
-        finfo_close($finfo);
-
-        $allowed = [
-            'application/pdf' => 'pdf',
-            'application/msword' => 'doc',
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx',
-        ];
-
-        if (!isset($allowed[$mime])) {
-            $error = 'Format non autorisé. Formats acceptés : PDF ou Word.';
-        } else {
-            if (!is_dir($upload_dir)) {
-                mkdir($upload_dir, 0775, true);
-            }
-
-            $extension = $allowed[$mime];
-            $fichier = 'memoire_' . date('YmdHis') . '_' . bin2hex(random_bytes(4)) . '.' . $extension;
-            $destination = $upload_dir . DIRECTORY_SEPARATOR . $fichier;
-
-            if (move_uploaded_file($_FILES['fichier']['tmp_name'], $destination)) {
-                $source = 'etudiant_diplome';
-                $statut = 'en_attente';
-                $columns = ['nomAut', 'prenomAut', 'theme', 'idfiliere', 'idCentre', 'annee_academique', 'maitre_memoire', 'examinateur', 'president_jury', 'fichier', 'statut', 'source', 'idetudiant'];
-                $placeholders = array_fill(0, count($columns), '?');
-                $types = 'sssiisssssssi';
-                $params = [$student['nom'], $student['prenom'], $theme, $idfiliere, $idCentre, $annee, $maitre, $examinateur, $president, $fichier, $statut, $source, $idetudiant];
-
-                if (column_exists($conn, 'ancien_memoire', 'mots_cles')) {
-                    $columns[] = 'mots_cles';
-                    $placeholders[] = '?';
-                    $types .= 's';
-                    $params[] = $mots_cles;
-                }
-                if (column_exists($conn, 'ancien_memoire', 'date_soutenance')) {
-                    $columns[] = 'date_soutenance';
-                    $placeholders[] = '?';
-                    $types .= 's';
-                    $params[] = $date_soutenance;
-                }
-
-                $sql = 'INSERT INTO ancien_memoire (' . implode(', ', $columns) . ') VALUES (' . implode(', ', $placeholders) . ')';
-                $stmt = mysqli_prepare($conn, $sql);
-                bind_dynamic($stmt, $types, $params);
-
-                if (mysqli_stmt_execute($stmt)) {
-                    $message = 'Nouveau mémoire déposé par ' . trim($student['prenom'] . ' ' . $student['nom']) . ' : ' . $theme;
-                    foreach (array_unique([$id_maitre, $id_examinateur, $id_president]) as $idprof) {
-                        notify_professor($conn, (int) $idprof, $message);
-                    }
-                    $success = 'Votre mémoire a été déposé avec succès. Il est en attente de validation.';
-                } else {
-                    $error = 'Impossible d enregistrer le mémoire.';
-                }
-            } else {
-                $error = 'Impossible d enregistrer le fichier.';
-            }
-        }
+        $error = $result['error'];
     }
 }
+
+$depositData = $etudiantController->getDepositData();
+$filieres = $depositData['filieres'];
+$centres = $depositData['centres'];
+$professeurs = $depositData['professeurs'];
+$annee_default = date('Y') . '-' . (date('Y') + 1);
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -199,17 +90,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <label for="idCentre">Centre</label>
                     <select id="idCentre" name="idCentre" required>
                         <option value="">Sélectionnez un centre</option>
-                        <?php if ($centres) { mysqli_data_seek($centres, 0); while ($centre = mysqli_fetch_assoc($centres)): ?>
+                        <?php foreach ($centres as $centre): ?>
                             <option value="<?= (int) $centre['idCentre'] ?>"><?= e($centre['nomCentre']) ?></option>
-                        <?php endwhile; } ?>
+                        <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="field">
                     <label for="idfiliere">Filière</label>
                     <select id="idfiliere" name="idfiliere" required>
-                        <?php if ($filieres) { while ($filiere = mysqli_fetch_assoc($filieres)): ?>
+                        <?php foreach ($filieres as $filiere): ?>
                             <option value="<?= (int) $filiere['idfiliere'] ?>" <?= (int) $student['idfiliere'] === (int) $filiere['idfiliere'] ? 'selected' : '' ?>><?= e($filiere['nom_filiere']) ?></option>
-                        <?php endwhile; } ?>
+                        <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="field">
@@ -350,4 +241,3 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </script>
 </body>
 </html>
-

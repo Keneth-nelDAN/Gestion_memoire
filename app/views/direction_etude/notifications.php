@@ -1,7 +1,6 @@
 <?php
 session_start();
-require_once __DIR__ . '/../../../config/database.php';
-require_once __DIR__ . '/../../../config/mysqli_config.php';
+require_once __DIR__ . '/../../controllers/notificationController.php';
 require_once __DIR__ . '/de_helpers.php';
 
 // Vérifier que l'utilisateur est un directeur
@@ -10,36 +9,31 @@ if (empty($_SESSION['idde']) && (empty($_SESSION['user']) || $_SESSION['user']['
     exit;
 }
 
+$notificationController = new NotificationController();
+
 $active_page = 'notifications';
+require_once __DIR__ . '/../../../config/mysqli_config.php';
 $de_profile = get_de_profile($conn);
 $nom_de = $de_profile['nom_de'];
 $initiales_de = $de_profile['initiales_de'];
+
 $success = '';
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'mark_read') {
-    $stmt = mysqli_prepare($conn, 'UPDATE notification SET statut_lecture = 1 WHERE statut_lecture = 0');
-    if ($stmt && mysqli_stmt_execute($stmt)) {
+    if ($notificationController->markAllAsRead()) {
         $success = 'Toutes les notifications ont été marquées comme lues.';
     } else {
         $error = 'Impossible de mettre à jour les notifications.';
     }
 }
 
-$notifications = mysqli_query($conn, "
-    SELECT n.idnotification, n.message, n.statut_lecture, n.date_notification,
-           CONCAT(e.prenom, ' ', e.nom) AS etudiant,
-           CONCAT(p.prenom, ' ', p.nom) AS professeur
-    FROM notification n
-    LEFT JOIN etudiant e ON e.idetudiant = n.idetudiant
-    LEFT JOIN professeur p ON p.idprof = n.idprof
-    ORDER BY n.date_notification DESC, n.idnotification DESC
-");
-
-$total_notifications = $notifications ? mysqli_num_rows($notifications) : 0;
-$unread_result = mysqli_query($conn, 'SELECT COUNT(*) FROM notification WHERE statut_lecture = 0');
-$unread_row = $unread_result ? mysqli_fetch_row($unread_result) : [0];
-$unread_count = (int) ($unread_row[0] ?? 0);
+$notifications = $notificationController->getAll();
+$total_notifications = count($notifications);
+$unread_count = 0;
+foreach ($notifications as $n) {
+    if ((int)$n['statut_lecture'] === 0) $unread_count++;
+}
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -101,8 +95,8 @@ $unread_count = (int) ($unread_row[0] ?? 0);
             </div>
 
             <div class="notification-list">
-                <?php if ($notifications && mysqli_num_rows($notifications) > 0): ?>
-                    <?php mysqli_data_seek($notifications, 0); while ($notification = mysqli_fetch_assoc($notifications)): ?>
+                <?php if (!empty($notifications)): ?>
+                    <?php foreach ($notifications as $notification): ?>
                         <?php
                             $sender = trim($notification['etudiant'] ?? '');
                             $sender_type = 'Étudiant';
@@ -133,7 +127,7 @@ $unread_count = (int) ($unread_row[0] ?? 0);
                             </div>
                             <span class="badge"><?= $is_unread ? 'Non lue' : 'Lue' ?></span>
                         </article>
-                    <?php endwhile; ?>
+                    <?php endforeach; ?>
                 <?php else: ?>
                     <div class="empty-state">Aucune notification reçue pour le moment.</div>
                 <?php endif; ?>

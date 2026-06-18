@@ -3,8 +3,8 @@ session_start();
 
 define('SECURE_ACCESS', true);
 
-require_once __DIR__ . '/../../../config/database.php';
-require_once __DIR__ . '/../../../config/mysqli_config.php';
+require_once __DIR__ . '/../../controllers/juryController.php';
+require_once __DIR__ . '/../../controllers/professeurController.php';
 
 // Vérifier si l'utilisateur est connecté et est un professeur
 if (empty($_SESSION['user']) || $_SESSION['user']['type'] !== 'professeur') {
@@ -18,16 +18,11 @@ if (!$idprof) {
     exit;
 }
 
+$juryController = new JuryController();
+$professeurController = new ProfesseurController();
+
 // Récupérer les informations du professeur
-$professor = null;
-$stmt = mysqli_prepare($conn, "SELECT idprof, nom, prenom, email FROM professeur WHERE idprof = ? LIMIT 1");
-if ($stmt) {
-    mysqli_stmt_bind_param($stmt, 'i', $idprof);
-    mysqli_stmt_execute($stmt);
-    $result = mysqli_stmt_get_result($stmt);
-    $professor = mysqli_fetch_assoc($result);
-    mysqli_stmt_close($stmt);
-}
+$professor = $professeurController->getProfile($idprof);
 
 if (!$professor) {
     header('Location: ../auth/connexion.php');
@@ -36,9 +31,6 @@ if (!$professor) {
 
 $prenom = htmlspecialchars($professor['prenom'] ?? '', ENT_QUOTES, 'UTF-8');
 $nom = htmlspecialchars($professor['nom'] ?? '', ENT_QUOTES, 'UTF-8');
-$email = htmlspecialchars($professor['email'] ?? '', ENT_QUOTES, 'UTF-8');
-
-$email_escaped = mysqli_real_escape_string($conn, $email);
 
 $success_message = '';
 $error_message = '';
@@ -51,105 +43,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['memoire_id'])) {
     if (empty($content)) {
         $error_message = "Veuillez rédiger le contenu de votre observation avant d'envoyer.";
     } else {
-        $content_escaped = mysqli_real_escape_string($conn, $content);
-        
-        $insert_ok = false;
-        
-        // Trouver d'abord l'id de l'étudiant lié à ce mémoire
-        $stu_id = null;
-        $res_stu = mysqli_query($conn, "SELECT idetudiant FROM memoire WHERE idmemoire = $mem_id LIMIT 1");
-        if ($res_stu && $row_stu = mysqli_fetch_assoc($res_stu)) {
-            $stu_id = intval($row_stu['idetudiant']);
-        }
-        
-        if ($stu_id) {
-            // 1. Essai d'insertion dans la table `commentaire` réelle de leur dictionnaire
-            $sql_c = "INSERT INTO `commentaire` (`contenu`, `idmemoire`, `idetudiant`, `date_commentaire`) 
-                      VALUES ('$content_escaped', $mem_id, $stu_id, NOW())";
-            $insert_ok = mysqli_query($conn, $sql_c);
-        }
-        
-        // Si ça a échoué ou que stu_id n'a pas été trouvé (ancien mémoire archive)
-        if (!$insert_ok) {
-            // Écriture de l'observation dans la table `jury`
-            $sql_j = "UPDATE jury 
-                      SET observation = '$content_escaped', 
-                          date_decision = NOW() 
-                      WHERE idmemoire = $mem_id AND idprof = $idprof";
-            $insert_ok = mysqli_query($conn, $sql_j);
-        }
-        
-        if (!$insert_ok) {
-            // Fallback ultime pour s'assurer du succès d'interface
-            $insert_ok = true;
-        }
-
-        if ($insert_ok) {
+        if ($juryController->addObservation($mem_id, $idprof, $content, $nom . " " . $prenom)) {
             $success_message = "Votre observation pédagogique a été enregistrée avec succès et diffusée de manière sécurisée.";
         } else {
-            $error_message = "Impossible d'insérer l'observation : " . mysqli_error($conn);
+            $error_message = "Impossible d'insérer l'observation.";
         }
     }
 }
 
 // Récupérer la liste des mémoires assignés pour alimenter la sélection
-$jury_ok = false;
-$memos = [];
+$memos = $juryController->getAssignedMemoires($idprof);
 
-// 1. Essai sur JURY / MEMOIRE
-$memos_sql = "SELECT m.idmemoire AS id, m.theme AS theme, m.theme AS titre, 
-                     CONCAT(e.prenom, ' ', e.nom) AS etudiant
-              FROM jury j
-              JOIN memoire m ON j.idmemoire = m.idmemoire
-              JOIN etudiant e ON m.idetudiant = e.idetudiant
-              WHERE j.idprof = $idprof
-              ORDER BY m.idmemoire DESC";
-$memos_res = mysqli_query($conn, $memos_sql);
-if ($memos_res) {
-    while ($row = mysqli_fetch_assoc($memos_res)) {
-        $memos[] = $row;
-    }
-    if (count($memos) > 0) {
-        $jury_ok = true;
-    }
-}
-
-// Fallback sur `ancien_memoire`
-if (!$jury_ok) {
-    $memos_sql = "SELECT idAM AS id, theme AS theme, theme AS titre,
-                         CONCAT(prenomAut, ' ', nomAut) AS etudiant
-                  FROM `ancien_memoire` 
-                  WHERE (examinateur = '$email_escaped' OR president_jury = '$email_escaped') 
-                  ORDER BY idAM DESC";
-    $memos_res = mysqli_query($conn, $memos_sql);
-    if ($memos_res) {
-        while ($row = mysqli_fetch_assoc($memos_res)) {
-            $memos[] = $row;
-        }
-    }
-}
-
-// Simulation réaliste de flux d'observations historiques
-$mock_observations = [
-    [
-        'id' => 1,
-        'title' => 'Mise en place d\'un modèle d\'Intelligence Artificielle',
-        'etudiant' => 'Aurel KPONOU',
-        'auteur' => 'Dr. Sévérin Kpovié',
-        'role' => 'Rapporteur / Jury',
-        'content' => "Veuillez me transmettre le code source exhaustif de votre architecture CNN et le document final révisé en format PDF pour relecture finale d'ici mardi soir.",
-        'date' => 'Aujourd\'hui, 10:15'
-    ],
-    [
-        'id' => 2,
-        'title' => 'Sécurisation et optimisation de la bande passante',
-        'etudiant' => 'Yasmine AGOSSOU',
-        'auteur' => 'Ing. Jean-Luc CODJIA',
-        'role' => 'Superviseur / Encadrant',
-        'content' => "Le traitement d'implémentation pfSense est bien mené. Pensez à compléter la bibliographie avec des références d'articles récents de cybersécurité.",
-        'date' => 'Hier, 16:45'
-    ]
-];
+// Récupérer les observations réelles
+$observations_to_display = $juryController->getRecentObservations($idprof);
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -533,25 +439,32 @@ $mock_observations = [
                         <h3><i class="fas fa-history text-muted"></i> Flux récent d'Échanges</h3>
                         
                         <div class="obs-timeline">
-                            <?php foreach ($mock_observations as $obs): ?>
-                                <div class="obs-item">
-                                    <div class="obs-header">
-                                        <h4><?php echo htmlspecialchars($obs['title']); ?></h4>
-                                        <div class="obs-meta d-flex justify-content-between">
-                                            <span><i class="fas fa-graduation-cap me-1"></i> Étudiant(e) : <?php echo htmlspecialchars($obs['etudiant']); ?></span>
-                                            <span><i class="far fa-calendar-alt me-1"></i> <?php echo $obs['date']; ?></span>
+                            <?php if (!empty($observations_to_display)): ?>
+                                <?php foreach ($observations_to_display as $obs): ?>
+                                    <div class="obs-item">
+                                        <div class="obs-header">
+                                            <h4><?php echo htmlspecialchars($obs['title']); ?></h4>
+                                            <div class="obs-meta d-flex justify-content-between">
+                                                <span><i class="fas fa-graduation-cap me-1"></i> Étudiant(e) : <?php echo htmlspecialchars($obs['etudiant']); ?></span>
+                                                <span><i class="far fa-calendar-alt me-1"></i> <?php echo date('d/m/Y H:i', strtotime($obs['date'])); ?></span>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="obs-comment-card">
+                                            <div class="comment-header">
+                                                <strong class="text-slate-800"><?php echo htmlspecialchars($obs['auteur']); ?></strong>
+                                                <span class="comment-role"><?php echo htmlspecialchars($obs['role']); ?></span>
+                                            </div>
+                                            <p class="comment-text">"<?php echo htmlspecialchars($obs['contenu']); ?>"</p>
                                         </div>
                                     </div>
-                                    
-                                    <div class="obs-comment-card">
-                                        <div class="comment-header">
-                                            <strong class="text-slate-800"><?php echo htmlspecialchars($obs['auteur']); ?></strong>
-                                            <span class="comment-role"><?php echo htmlspecialchars($obs['role']); ?></span>
-                                        </div>
-                                        <p class="comment-text">"<?php echo htmlspecialchars($obs['content']); ?>"</p>
-                                    </div>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <div class="text-center py-5">
+                                    <i class="fas fa-comment-slash fa-3x text-muted mb-3"></i>
+                                    <p class="text-muted">Aucune observation enregistrée pour le moment.</p>
                                 </div>
-                            <?php endforeach; ?>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
