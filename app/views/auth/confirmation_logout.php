@@ -65,32 +65,6 @@ if (isset($_SESSION['idetudiant']) || (isset($_SESSION['userType']) && $_SESSION
     $cancelUrl = $_SERVER['HTTP_REFERER'];
 }
 
-// 4. Traitement de la déconnexion effective
-if (isset($_POST['action']) && $_POST['action'] === 'confirm_logout') {
-    // Nettoyage complet du tableau de session
-    $_SESSION = [];
-
-    // Destruction du cookie de session si activé
-    if (ini_get("session.use_cookies")) {
-        $params = session_get_cookie_params();
-        setcookie(
-            session_name(),
-            '',
-            time() - 42000,
-            $params["path"],
-            $params["domain"],
-            $params["secure"],
-            $params["httponly"]
-        );
-    }
-
-    // Destruction finale de la session côté serveur
-    session_destroy();
-
-    // Redirection stricte et propre vers le point d'entrée de connexion
-    header("Location: /Gestion_memoire/app/views/auth/connexion.php");
-    exit;
-}
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -385,8 +359,8 @@ if (isset($_POST['action']) && $_POST['action'] === 'confirm_logout') {
                 </div>
             </div>
 
-            <form method="POST" action="" class="actions-form">
-                <button type="submit" name="action" value="confirm_logout" class="btn btn-danger">
+            <form method="POST" action="/Gestion_memoire/public/logout" class="actions-form">
+                <button type="submit" class="btn btn-danger">
                     Oui, me déconnecter
                     <i class="fa-solid fa-sign-out-alt"></i>
                 </button>

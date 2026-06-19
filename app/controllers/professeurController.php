@@ -1,129 +1,124 @@
 <?php
 
 require_once __DIR__ . '/../../config/database.php';
-require_once __DIR__ . '/../models/professeur.php';
 
-class ProfesseurController {
+class ProfesseurController
+{
     private $db;
-    private $professeurModel;
 
-    public function __construct() {
+    public function __construct()
+    {
         $database = new Database();
         $this->db = $database->connect();
-        $this->professeurModel = new Professeur($this->db);
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
     }
 
-    public function getProfile($idprof) {
-        return $this->professeurModel->getById($idprof);
+    public function getDashboardData($idprof)
+    {
+        if (!$idprof) return null;
+
+        try {
+            // 1. Profil du professeur
+            $stmt_prof = $this->db->prepare("SELECT * FROM professeur WHERE idprof = :idprof");
+            $stmt_prof->execute([':idprof' => $idprof]);
+            $professor = $stmt_prof->fetch(PDO::FETCH_ASSOC);
+            if (!$professor) return null;
+
+            // 2. Statistiques
+            $stmt_stats = $this->db->prepare("
+                SELECT 
+                    COUNT(*) as nb_evaluations,
+                    SUM(CASE WHEN m.statut = 'en_attente' THEN 1 ELSE 0 END) as nb_a_valider,
+                    SUM(CASE WHEN m.statut = 'valide' THEN 1 ELSE 0 END) as nb_valides
+                FROM jury j
+                JOIN memoire m ON j.idmemoire = m.idmemoire
+                WHERE j.idprof = :idprof
+            ");
+            $stmt_stats->execute([':idprof' => $idprof]);
+            $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
+
+            // 3. Mémoires récents
+            $stmt_recent = $this->db->prepare("SELECT m.theme as titre, CONCAT(e.prenom, ' ', e.nom) as etudiant, f.nom_filiere as filiere, m.statut FROM jury j JOIN memoire m ON j.idmemoire = m.idmemoire JOIN etudiant e ON m.idetudiant = e.idetudiant LEFT JOIN filiere f ON m.idfiliere = f.idfiliere WHERE j.idprof = :idprof ORDER BY m.datesoumission DESC LIMIT 5");
+            $stmt_recent->execute([':idprof' => $idprof]);
+            $recent_memos = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
+
+            return ['professor' => $professor, 'stats' => $stats, 'recent_memos' => $recent_memos];
+        } catch (PDOException $e) {
+            // En cas d'erreur, retourner null pour éviter de planter la page
+            return null;
+        }
     }
 
-    public function getDashboardData($idprof) {
-        $professor = $this->getProfile($idprof);
-        if (!$professor) return null;
+    public function getAll()
+    {
+        try {
+            $stmt = $this->db->prepare("SELECT idprof, nom, prenom, email FROM professeur ORDER BY nom, prenom");
+            $stmt->execute();
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            return [];
+        }
+    }
 
-        $email = $professor['email'];
+    public function create()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            header('Location: /Gestion_memoire/app/views/direction_etude/professeurs_de.php');
+            exit;
+        }
 
-        // 1. Essai via JURY
-        $sql_total = "SELECT COUNT(*) FROM jury WHERE idprof = :idprof";
-        $stmt_total = $this->db->prepare($sql_total);
-        $stmt_total->execute([':idprof' => $idprof]);
-        $nb_evaluations = $stmt_total->fetchColumn();
+        if (empty($_SESSION['idde'])) {
+            $_SESSION['flash']['error'] = "Accès non autorisé.";
+            header('Location: /Gestion_memoire/public/login.php');
+            exit;
+        }
 
-        $sql_recent = "
-            SELECT m.idmemoire AS id, m.theme AS titre, 
-                   CONCAT(e.prenom, ' ', e.nom) AS etudiant, 
-                   f.nom_filiere AS filiere, e.niveau AS niveau, m.statut AS statut, 
-                   m.datesoumission AS date_depot, j.decision AS note
-            FROM jury j
-            JOIN memoire m ON j.idmemoire = m.idmemoire
-            JOIN etudiant e ON m.idetudiant = e.idetudiant
-            LEFT JOIN filiere f ON m.idfiliere = f.idfiliere
-            WHERE j.idprof = :idprof
-            ORDER BY m.idmemoire DESC LIMIT 5
-        ";
-        $stmt_recent = $this->db->prepare($sql_recent);
-        $stmt_recent->execute([':idprof' => $idprof]);
-        $recent_memos = $stmt_recent->fetchAll(PDO::FETCH_ASSOC);
+        $nom = trim($_POST['nom'] ?? '');
+        $prenom = trim($_POST['prenom'] ?? '');
+        $email = trim($_POST['email'] ?? '');
+        $password = trim($_POST['motdepasse'] ?? '');
 
-        $nb_a_valider = 0;
-        $nb_valides = 0;
-
-        if ($nb_evaluations > 0) {
-            $sql_attente = "SELECT COUNT(*) FROM jury WHERE idprof = :idprof AND (decision IS NULL OR decision = '' OR decision = 'en_attente')";
-            $stmt_attente = $this->db->prepare($sql_attente);
-            $stmt_attente->execute([':idprof' => $idprof]);
-            $nb_a_valider = $stmt_attente->fetchColumn();
-
-            $sql_valide = "SELECT COUNT(*) FROM jury WHERE idprof = :idprof AND decision IS NOT NULL AND decision <> '' AND decision <> 'en_attente' AND decision <> 'refuse'";
-            $stmt_valide = $this->db->prepare($sql_valide);
-            $stmt_valide->execute([':idprof' => $idprof]);
-            $nb_valides = $stmt_valide->fetchColumn();
+        if (empty($nom) || empty($prenom) || empty($email) || empty($password)) {
+            $_SESSION['flash']['error'] = 'Veuillez remplir tous les champs.';
+        } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $_SESSION['flash']['error'] = 'Le format de l\'email est invalide.';
         } else {
-            // Fallback sur ancien_memoire
-            $sql_total_alt = "SELECT COUNT(*) FROM ancien_memoire WHERE examinateur = :email OR president_jury = :email";
-            $stmt_total_alt = $this->db->prepare($sql_total_alt);
-            $stmt_total_alt->execute([':email' => $email]);
-            $nb_evaluations = $stmt_total_alt->fetchColumn();
+            try {
+                $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
+                $stmt = $this->db->prepare("INSERT INTO professeur (nom, prenom, email, motdepasse) VALUES (:nom, :prenom, :email, :motdepasse)");
+                $stmt->execute([':nom' => $nom, ':prenom' => $prenom, ':email' => $email, ':motdepasse' => $hashedPassword]);
 
-            $sql_attente_alt = "SELECT COUNT(*) FROM ancien_memoire WHERE statut = 'en_attente' AND (examinateur = :email OR president_jury = :email)";
-            $stmt_attente_alt = $this->db->prepare($sql_attente_alt);
-            $stmt_attente_alt->execute([':email' => $email]);
-            $nb_a_valider = $stmt_attente_alt->fetchColumn();
-
-            $sql_valide_alt = "SELECT COUNT(*) FROM ancien_memoire WHERE statut IN ('valide', 'publié', 'publie') AND (examinateur = :email OR president_jury = :email)";
-            $stmt_valide_alt = $this->db->prepare($sql_valide_alt);
-            $stmt_valide_alt->execute([':email' => $email]);
-            $nb_valides = $stmt_valide_alt->fetchColumn();
-
-            $sql_recent_alt = "
-                SELECT idAM AS id, theme AS titre, 
-                       CONCAT(prenomAut, ' ', nomAut) AS etudiant, 
-                       (SELECT nom_filiere FROM filiere WHERE idfiliere = ancien_memoire.idfiliere LIMIT 1) AS filiere, 
-                       (SELECT nomNiveau FROM niveau WHERE idNiveau = ancien_memoire.idNiveau LIMIT 1) AS niveau, 
-                       statut, date_depot, '' AS note
-                FROM ancien_memoire 
-                WHERE examinateur = :email OR president_jury = :email 
-                ORDER BY idAM DESC LIMIT 5
-            ";
-            $stmt_recent_alt = $this->db->prepare($sql_recent_alt);
-            $stmt_recent_alt->execute([':email' => $email]);
-            $recent_memos = $stmt_recent_alt->fetchAll(PDO::FETCH_ASSOC);
+                $_SESSION['flash']['success'] = 'Compte professeur créé avec succès.';
+                $_SESSION['flash']['password'] = $password;
+            } catch (PDOException $e) {
+                if ($e->errorInfo[1] == 1062) { // Duplicate entry
+                    $_SESSION['flash']['error'] = 'Cet email est déjà utilisé par un autre professeur.';
+                } else {
+                    $_SESSION['flash']['error'] = 'Une erreur est survenue lors de la création du compte.';
+                }
+            }
         }
 
-        return [
-            'professor' => $professor,
-            'stats' => [
-                'nb_evaluations' => $nb_evaluations,
-                'nb_a_valider' => $nb_a_valider,
-                'nb_valides' => $nb_valides
-            ],
-            'recent_memos' => $recent_memos
-        ];
+        header('Location: /Gestion_memoire/app/views/direction_etude/professeurs_de.php');
+        exit;
     }
 
-    public function getAll() {
-        $sql = "SELECT idprof, nom, prenom, email FROM professeur ORDER BY idprof DESC";
-        return $this->db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
-    }
-
-    public function addProfesseur($data) {
-        $nom = trim($data['nom'] ?? '');
-        $prenom = trim($data['prenom'] ?? '');
-        $email = strtolower(trim($data['email'] ?? ''));
-        $password = trim($data['motdepasse'] ?? '');
-
-        if ($nom === '' || $prenom === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            return ['success' => false, 'error' => 'Veuillez renseigner le nom, le prénom et un email valide.'];
+    public function getDEProfile()
+    {
+        if (empty($_SESSION['idde'])) {
+            return ['nom_de' => 'Direction', 'initiales_de' => 'DE'];
         }
-
-        if ($this->professeurModel->exists($email)) {
-            return ['success' => false, 'error' => 'Un professeur utilise déjà cet email.'];
+        try {
+            $stmt = $this->db->prepare("SELECT nom, prenom FROM direction_etude WHERE idde = :idde");
+            $stmt->execute([':idde' => $_SESSION['idde']]);
+            $de = $stmt->fetch(PDO::FETCH_ASSOC);
+            $nom_de = trim(($de['prenom'] ?? '') . ' ' . ($de['nom'] ?? ''));
+            $initiales_de = strtoupper(substr($de['prenom'] ?? 'D', 0, 1) . substr($de['nom'] ?? 'E', 0, 1));
+            return ['nom_de' => $nom_de, 'initiales_de' => $initiales_de];
+        } catch (PDOException $e) {
+            return ['nom_de' => 'Direction', 'initiales_de' => 'DE'];
         }
-
-        if ($this->professeurModel->create($nom, $prenom, $email, $password)) {
-            return ['success' => true, 'password' => $password];
-        }
-
-        return ['success' => false, 'error' => 'Impossible de créer le compte professeur.'];
     }
 }

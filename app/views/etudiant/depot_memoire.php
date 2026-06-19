@@ -8,35 +8,24 @@ if (empty($_SESSION['idetudiant'])) {
 }
 
 $etudiantController = new EtudiantController();
-$idetudiant = (int) $_SESSION['idetudiant'];
-$student = $etudiantController->getProfile($idetudiant);
+$viewData = $etudiantController->getDepotView();
 
+$student = $viewData['student'];
 if (!$student || (($student['type_compte'] ?? 'consultant') !== 'diplome')) {
     header('Location: dashboard_etudiant.php');
     exit;
 }
 
+$success = $viewData['success'];
+$error = $viewData['error'];
+$filieres = $viewData['filieres'];
+$centres = $viewData['centres'];
+$professeurs = $viewData['professeurs'];
+$annee_default = $viewData['annee_default'];
+
 function e($value) {
     return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
 }
-
-$success = '';
-$error = '';
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $result = $etudiantController->handleDeposer();
-    if (isset($result['success'])) {
-        $success = $result['success'];
-    } else {
-        $error = $result['error'];
-    }
-}
-
-$depositData = $etudiantController->getDepositData();
-$filieres = $depositData['filieres'];
-$centres = $depositData['centres'];
-$professeurs = $depositData['professeurs'];
-$annee_default = date('Y') . '-' . (date('Y') + 1);
 ?>
 <!DOCTYPE html>
 <html lang="fr">

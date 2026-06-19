@@ -38,6 +38,9 @@ class AuthController {
             if ($result['user']['type'] === 'etudiant') $_SESSION['idetudiant'] = $user_id;
             if ($result['user']['type'] === 'professeur') $_SESSION['idprof'] = $user_id;
             if ($result['user']['type'] === 'directeur') $_SESSION['idde'] = $user_id;
+
+            // Ajouter l'URL de redirection vers le contrôleur du tableau de bord
+            $result['redirectUrl'] = '/Gestion_memoire/public/dashboard';
         }
 
         // 4. Renvoyer la réponse au format JSON au script JavaScript du client
@@ -45,6 +48,33 @@ class AuthController {
         echo json_encode($result);
     }
 
+    public function logout()
+    {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+
+        // Nettoyage complet du tableau de session
+        $_SESSION = [];
+
+        // Destruction du cookie de session si activé
+        if (ini_get("session.use_cookies")) {
+            $params = session_get_cookie_params();
+            setcookie(
+                session_name(),
+                '',
+                time() - 42000,
+                $params["path"],
+                $params["domain"],
+                $params["secure"],
+                $params["httponly"]
+            );
+        }
+
+        session_destroy();
+        header("Location: /Gestion_memoire/public/login.php");
+        exit;
+    }
     public function __construct() {
         $database = new Database();
         $this->db = $database->connect();
@@ -169,10 +199,28 @@ class AuthController {
             $stmt->execute([':email' => $email]);
             $etudiant = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            $password = trim($password);
-            $storedPassword = trim((string) $etudiant['motdepasse']);
-            $passwordMatches = $etudiant && (password_verify($password, $storedPassword) || hash_equals($storedPassword, $password));
-            if ($passwordMatches) {
+            if ($etudiant) {
+                $password = trim($password);
+                $storedPassword = trim((string) $etudiant['motdepasse']);
+                $passwordMatches = false;
+                $needsRehash = false;
+
+                if (password_verify($password, $storedPassword)) {
+                    $passwordMatches = true;
+                    if (password_needs_rehash($storedPassword, PASSWORD_DEFAULT)) {
+                        $needsRehash = true;
+                    }
+                } elseif (hash_equals($storedPassword, $password)) { // Plain text check
+                    $passwordMatches = true;
+                    $needsRehash = true;
+                }
+
+                if ($passwordMatches) {
+                    if ($needsRehash) {
+                        $newHash = password_hash($password, PASSWORD_DEFAULT);
+                        $rehash_stmt = $this->db->prepare('UPDATE etudiant SET motdepasse = :motdepasse WHERE idetudiant = :idetudiant');
+                        $rehash_stmt->execute([':motdepasse' => $newHash, ':idetudiant' => $etudiant['idetudiant']]);
+                    }
                 // Connexion réussie
                 return [
                     'success' => true,
@@ -185,16 +233,17 @@ class AuthController {
                         'type' => 'etudiant'
                     ]
                 ];
-            } else {
-                return [
-                    'success' => false,
-                    'message' => 'Email ou mot de passe incorrect'
-                ];
+                }
             }
+            
+            return [
+                'success' => false,
+                'message' => 'Email ou mot de passe incorrect'
+            ];
         } catch (Exception $e) {
             return [
                 'success' => false,
-                'message' => 'Erreur lors de la connexion : ' . $e->getMessage()
+                'message' => 'Erreur de connexion au serveur.'
             ];
         }
     }
@@ -268,10 +317,27 @@ class AuthController {
             $stmt->execute([':email' => $email]);
             $directeur = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            $password = trim($password);
-            $storedPassword = trim((string) $directeur['motdepasse']);
-            $passwordMatches = $directeur && (password_verify($password, $storedPassword) || hash_equals($storedPassword, $password));
-            if ($passwordMatches) {
+            if ($directeur) {
+                $password = trim($password);
+                $storedPassword = trim((string) $directeur['motdepasse']);
+                $passwordMatches = false;
+                $needsRehash = false;
+
+                if (password_verify($password, $storedPassword)) {
+                    $passwordMatches = true;
+                    if (password_needs_rehash($storedPassword, PASSWORD_DEFAULT)) {
+                        $needsRehash = true;
+                    }
+                } elseif (hash_equals($storedPassword, $password)) { // Plain text check
+                    $passwordMatches = true;
+                    $needsRehash = true;
+                }
+                if ($passwordMatches) {
+                    if ($needsRehash) {
+                        $newHash = password_hash($password, PASSWORD_DEFAULT);
+                        $rehash_stmt = $this->db->prepare('UPDATE direction_etude SET motdepasse = :motdepasse WHERE idde = :idde');
+                        $rehash_stmt->execute([':motdepasse' => $newHash, ':idde' => $directeur['idde']]);
+                    }
                 // Connexion réussie
                 return [
                     'success' => true,
@@ -284,12 +350,12 @@ class AuthController {
                         'type' => 'directeur'
                     ]
                 ];
-            } else {
-                return [
-                    'success' => false,
-                    'message' => 'Email ou mot de passe incorrect'
-                ];
+                }
             }
+            return [
+                'success' => false,
+                'message' => 'Email ou mot de passe incorrect'
+            ];
         } catch (Exception $e) {
             return [
                 'success' => false,

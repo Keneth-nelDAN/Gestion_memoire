@@ -1,18 +1,19 @@
-﻿﻿<?php
+﻿﻿﻿﻿<?php
 session_start();
-require_once __DIR__ . '/../../../config/mysqli_config.php'; require_once __DIR__ . '/de_helpers.php';
+require_once __DIR__ . '/../../controllers/publicationController.php';
 
 // Note: La logique de traitement du formulaire (POST) a été déplacée
 // vers un contrôleur pour respecter l'architecture MVC.
 // Ce fichier ne gère plus que l'affichage.
 
-$active_page = 'publication';
-$de_profile = get_de_profile($conn);
-$nom_de = $de_profile['nom_de'] ?? 'Direction';
-$initiales_de = $de_profile['initiales_de'] ?? 'DE';
+$publicationController = new PublicationController();
+$sharedData = $publicationController->getSharedData();
+$filieres = $sharedData['filieres'];
+$centres = $sharedData['centres'];
 
-$filieres = mysqli_query($conn, "SELECT idfiliere, nom_filiere FROM filiere ORDER BY nom_filiere ASC");
-$centres = get_de_centres($conn);
+$active_page = 'publication';
+$nom_de = $_SESSION['user']['nom'] ?? 'Direction';
+$initiales_de = strtoupper(substr($_SESSION['user']['prenom'] ?? 'D', 0, 1) . substr($_SESSION['user']['nom'] ?? 'E', 0, 1));
 
 // Les variables $success et $error seraient passées par le contrôleur
 $success = $_SESSION['flash']['success'] ?? null;
@@ -63,18 +64,18 @@ unset($_SESSION['flash']);
                     <label>Filière</label>
                     <select name="idfiliere" required>
                         <option value="">Sélectionner</option>
-                        <?php while ($filiere = mysqli_fetch_assoc($filieres)): ?>
+                        <?php foreach ($filieres as $filiere): ?>
                             <option value="<?= (int) $filiere['idfiliere'] ?>"><?= e($filiere['nom_filiere']) ?></option>
-                        <?php endwhile; ?>
+                        <?php endforeach; ?>
                     </select>
                 </div>
                 <div>
                     <label>Centre</label>
                     <select name="idCentre">
                         <option value="">Non défini</option>
-                        <?php if ($centres) { while ($centre = mysqli_fetch_assoc($centres)): ?>
+                        <?php foreach ($centres as $centre): ?>
                             <option value="<?= (int) $centre['idCentre'] ?>"><?= e($centre['nomCentre']) ?></option>
-                        <?php endwhile; } ?>
+                        <?php endforeach; ?>
                     </select>
                 </div>
             </div>

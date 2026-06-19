@@ -1,58 +1,25 @@
 <?php
 session_start();
 require_once __DIR__ . '/../../controllers/etudiantController.php';
-require_once __DIR__ . '/de_helpers.php';
+require_once __DIR__ . '/../../controllers/professeurController.php';
 
-// Vérifier que l'utilisateur est un directeur
 if (empty($_SESSION['idde']) && (empty($_SESSION['user']) || $_SESSION['user']['type'] !== 'directeur')) {
     header('Location: ../auth/connexion.php');
     exit;
 }
 
 $etudiantController = new EtudiantController();
+$professeurController = new ProfesseurController();
 
-$active_page = 'etudiants';
-// get_de_profile uses mysqli
-require_once __DIR__ . '/../../../config/mysqli_config.php';
-$de_profile = get_de_profile($conn);
+$de_profile = $professeurController->getDEProfile();
 $nom_de = $de_profile['nom_de'];
 $initiales_de = $de_profile['initiales_de'];
+$active_page = 'etudiants';
 
-$success = '';
-$error = '';
-$generated_password = '';
-$mail_sent = false;
-$mail_error = '';
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $email = strtolower(trim($_POST['email'] ?? ''));
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL) || substr($email, -10) !== '@gmail.com') {
-        $error = 'Le compte étudiant doit être créé avec une adresse Gmail valide.';
-    } elseif ($etudiantController->exists($email)) {
-        $error = 'Un étudiant utilise déjà cette adresse Gmail.';
-    } else {
-        $password = generate_student_password();
-        
-        // On a besoin du nom du niveau
-        $idNiveau = (int)$_POST['idNiveau'];
-        $sql_n = "SELECT nomNiveau FROM niveau WHERE idNiveau = :id LIMIT 1";
-        $database = new Database(); $pdo = $database->connect();
-        $stmt_n = $pdo->prepare($sql_n); $stmt_n->execute([':id' => $idNiveau]);
-        $niveau_row = $stmt_n->fetch();
-        
-        $data = $_POST;
-        $data['password'] = $password;
-        $data['niveau'] = $niveau_row['nomNiveau'] ?? '';
-
-        if ($etudiantController->create($data)) {
-            $generated_password = $password;
-            $mail_sent = send_student_credentials_email($email, $_POST['prenom'], $password, $_POST['type_compte'], $mail_error);
-            $success = 'Compte étudiant créé avec succès.';
-        } else {
-            $error = 'Impossible de créer le compte étudiant.';
-        }
-    }
-}
+$createResult = $etudiantController->handleCreateEtudiant();
+$success = $createResult['success'];
+$error = $createResult['error'];
+$generated_password = $createResult['password'];
 
 $students = $etudiantController->getAll();
 $total_students = count($students);
@@ -67,11 +34,11 @@ foreach ($students as $s) {
 $depositData = $etudiantController->getDepositData();
 $filieres = $depositData['filieres'];
 $centres = $depositData['centres'];
+$niveaux = $etudiantController->getNiveaux();
 
-// Niveaux (pourrait être dans EtudiantController aussi)
-$sql_niv = "SELECT idNiveau, nomNiveau FROM niveau ORDER BY nomNiveau ASC";
-$niveaux = $pdo->query($sql_niv)->fetchAll(PDO::FETCH_ASSOC);
-
+function e($value) {
+    return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+}
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -99,12 +66,7 @@ $niveaux = $pdo->query($sql_niv)->fetchAll(PDO::FETCH_ASSOC);
         <?php if ($success): ?>
             <div class="alert success">
                 <?= e($success) ?>
-                <?php if ($mail_sent): ?>
-                    <br>Le mot de passe a été envoyé à l'adresse Gmail de l'étudiant.
-                <?php else: ?>
-                    <br>L'envoi email n'a pas abouti sur ce serveur. Mot de passe initial : <strong><?= e($generated_password) ?></strong>
-                    <?php if ($mail_error !== ''): ?><br>Détail : <?= e($mail_error) ?><?php endif; ?>
-                <?php endif; ?>
+                <br>L'envoi email n'a pas abouti sur ce serveur. Mot de passe initial : <strong><?= e($generated_password) ?></strong>
             </div>
         <?php endif; ?>
         <?php if ($error): ?><div class="alert error"><?= e($error) ?></div><?php endif; ?>
@@ -162,7 +124,7 @@ $niveaux = $pdo->query($sql_niv)->fetchAll(PDO::FETCH_ASSOC);
                     <option value="diplome">Étudiant diplômé - dépôt de mémoire autorisé</option>
                 </select>
 
-                <button class="btn-gold full" type="submit"><i class="fa-solid fa-paper-plane"></i> Créer et envoyer le mot de passe</button>
+                <button class="btn-gold full" type="submit"><i class="fa-solid fa-paper-plane"></i> Créer le compte étudiant</button>
             </form>
 
             <aside class="access-summary">

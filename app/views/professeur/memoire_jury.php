@@ -3,9 +3,7 @@ session_start();
 
 define('SECURE_ACCESS', true);
 
-require_once __DIR__ . '/../../../config/database.php';
-require_once __DIR__ . '/../../../config/mysqli_config.php';
-
+require_once __DIR__ . '/../../controllers/juryController.php';
 // Vérifier si l'utilisateur est connecté et est un professeur
 if (empty($_SESSION['user']) || $_SESSION['user']['type'] !== 'professeur') {
     header('Location: ../auth/connexion.php');
@@ -18,118 +16,22 @@ if (!$idprof) {
     exit;
 }
 
-// Récupérer les informations du professeur
-$professor = null;
-$stmt = mysqli_prepare($conn, "SELECT idprof, nom, prenom, email FROM professeur WHERE idprof = ? LIMIT 1");
-if ($stmt) {
-    mysqli_stmt_bind_param($stmt, 'i', $idprof);
-    mysqli_stmt_execute($stmt);
-    $result = mysqli_stmt_get_result($stmt);
-    $professor = mysqli_fetch_assoc($result);
-    mysqli_stmt_close($stmt);
-}
-
-if (!$professor) {
-    header('Location: ../auth/connexion.php');
-    exit;
-}
-
-$prenom = htmlspecialchars($professor['prenom'] ?? '', ENT_QUOTES, 'UTF-8');
-$nom = htmlspecialchars($professor['nom'] ?? '', ENT_QUOTES, 'UTF-8');
-$email = htmlspecialchars($professor['email'] ?? '', ENT_QUOTES, 'UTF-8');
-
-$email_escaped = mysqli_real_escape_string($conn, $email);
+$prenom = htmlspecialchars($_SESSION['user']['prenom'] ?? '', ENT_QUOTES, 'UTF-8');
+$nom = htmlspecialchars($_SESSION['user']['nom'] ?? '', ENT_QUOTES, 'UTF-8');
+$email = htmlspecialchars($_SESSION['user']['email'] ?? '', ENT_QUOTES, 'UTF-8');
 
 // Récupérer les filtres HTTP GET
 $filter_niveau = $_GET['niveau'] ?? 'tous';
 $filter_statut = $_GET['statut'] ?? 'tous';
 $search_query = $_GET['search'] ?? '';
 
-$jury_ok = false;
-$memos = [];
-
-// 1. Essai de requête active avec JURY et MEMOIRE
-$sql = "SELECT m.idmemoire AS id, m.theme AS theme, m.theme AS titre, 
-               CONCAT(e.prenom, ' ', e.nom) AS etudiant, 
-               CONCAT('GASA-', e.idetudiant) AS matricule,
-               f.nom_filiere AS filiere, e.niveau AS niveau, 
-               m.centre AS centre, m.annee_academique AS annee_acad, 
-               '' AS superviseur, m.statut AS statut, 
-               j.decision AS note, j.observation AS appreciations,
-               j.role_jury
-        FROM jury j
-        JOIN memoire m ON j.idmemoire = m.idmemoire
-        JOIN etudiant e ON m.idetudiant = e.idetudiant
-        LEFT JOIN filiere f ON m.idfiliere = f.idfiliere
-        WHERE j.idprof = $idprof";
-
-if ($filter_niveau !== 'tous') {
-    $lvl_escaped = mysqli_real_escape_string($conn, $filter_niveau);
-    $sql .= " AND e.niveau = '$lvl_escaped'";
-}
-
-if ($filter_statut !== 'tous') {
-    $st_escaped = mysqli_real_escape_string($conn, $filter_statut);
-    $sql .= " AND m.statut = '$st_escaped'";
-}
-
-if (!empty($search_query)) {
-    $search_escaped = mysqli_real_escape_string($conn, $search_query);
-    $sql .= " AND (m.theme LIKE '%$search_escaped%' OR e.nom LIKE '%$search_escaped%' OR e.prenom LIKE '%$search_escaped%')";
-}
-
-$sql .= " ORDER BY m.idmemoire DESC";
-$result = mysqli_query($conn, $sql);
-if ($result) {
-    while ($row = mysqli_fetch_assoc($result)) {
-        $memos[] = $row;
-    }
-    if (count($memos) > 0) {
-        $jury_ok = true;
-    }
-}
-
-// 2. Fallback si échec ou aucun résultat actif sur la table `ancien_memoire`
-if (!$jury_ok) {
-    $memos = [];
-    $sql = "SELECT idAM AS id, theme AS theme, theme AS titre,
-                   CONCAT(prenomAut, ' ', nomAut) AS etudiant,
-                   '' AS matricule,
-                   (SELECT nom_filiere FROM filiere WHERE idfiliere = `ancien_memoire`.idfiliere LIMIT 1) AS filiere,
-                   (SELECT nomNiveau FROM niveau WHERE idNiveau = `ancien_memoire`.idNiveau LIMIT 1) AS niveau,
-                   (SELECT nomCentre FROM centre WHERE idCentre = `ancien_memoire`.idCentre LIMIT 1) AS centre,
-                   annee_academique AS annee_acad,
-                   maitre_memoire AS superviseur,
-                   statut,
-                   '' AS note,
-                   '' AS appreciations,
-                   'Président/Examinateur' AS role_jury
-            FROM `ancien_memoire`
-            WHERE (examinateur = '$email_escaped' OR president_jury = '$email_escaped')";
-
-    if ($filter_niveau !== 'tous') {
-        $lvl_escaped = mysqli_real_escape_string($conn, $filter_niveau);
-        $sql .= " AND idNiveau = (SELECT idNiveau FROM niveau WHERE nomNiveau = '$lvl_escaped' LIMIT 1)";
-    }
-
-    if ($filter_statut !== 'tous') {
-        $st_escaped = mysqli_real_escape_string($conn, $filter_statut);
-        $sql .= " AND statut = '$st_escaped'";
-    }
-
-    if (!empty($search_query)) {
-        $search_escaped = mysqli_real_escape_string($conn, $search_query);
-        $sql .= " AND (theme LIKE '%$search_escaped%' OR nomAut LIKE '%$search_escaped%' OR prenomAut LIKE '%$search_escaped%')";
-    }
-
-    $sql .= " ORDER BY idAM DESC";
-    $result = mysqli_query($conn, $sql);
-    if ($result) {
-        while ($row = mysqli_fetch_assoc($result)) {
-            $memos[] = $row;
-        }
-    }
-}
+$juryController = new JuryController();
+$filters = [
+    'niveau' => $filter_niveau,
+    'statut' => $filter_statut,
+    'search' => $search_query,
+];
+$memos = $juryController->getFilteredMemoiresForJury($idprof, $email, $filters);
 ?>
 <!DOCTYPE html>
 <html lang="fr">

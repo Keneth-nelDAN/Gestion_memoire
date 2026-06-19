@@ -33,7 +33,8 @@ class MemoireController {
             $this->likeModel->remove($idAM, $idetudiant);
             $liked = false;
         } else {
-            $this->likeModel->add($idAM, $idetudiant);
+            // La table like_memoire n'a que idAM et idetudiant comme clés étrangères pertinentes
+            $this->likeModel->add($idAM, $idetudiant); 
             $liked = true;
         }
         $total_likes = $this->likeModel->countForMemoire($idAM);

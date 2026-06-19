@@ -2,8 +2,8 @@
 // get_pdf.php (À placer à la racine de votre dossier public : /public/get_pdf.php)
 session_start();
 
-// 1. Protection : Renvoyer une erreur si l'utilisateur n'est pas identifié
-if (!isset($_SESSION['idetudiant'])) {
+// 1. Protection : Renvoyer une erreur si aucun utilisateur n'est identifié (étudiant, prof, ou DE)
+if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
     http_response_code(403);
     die("Accès refusé. Vous devez être connecté.");
 }
@@ -20,7 +20,7 @@ $database = new Database();
 $pdo = $database->connect();
 
 // Récupération sécurisée du fichier dans la base de données
-$stmt = $pdo->prepare("SELECT file_name FROM ancien_memoire WHERE idAM = ?");
+$stmt = $pdo->prepare("SELECT fichier FROM ancien_memoire WHERE idAM = ?");
 $stmt->execute([$idAM]);
 $memoire = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -29,7 +29,7 @@ if (!$memoire) {
     die("Fichier introuvable.");
 }
 
-$filepath = realpath(__DIR__ . "/../app/memoire/uploads/memoires/") . DIRECTORY_SEPARATOR . $memoire['file_name'];
+$filepath = realpath(__DIR__ . "/../app/memoire/uploads/memoires/") . DIRECTORY_SEPARATOR . $memoire['fichier'];
 
 if (!file_exists($filepath)) {
     http_response_code(404);

@@ -1,11 +1,11 @@
 <?php
 
-class DirectionEtude {
-    private $db;
+require_once __DIR__ . '/../../config/mysqli_config.php';
+
+class DirectionEtudeService {
     private $conn;
 
-    public function __construct($db = null, $conn = null) {
-        $this->db = $db;
+    public function __construct($conn) {
         $this->conn = $conn;
     }
 
@@ -15,7 +15,7 @@ class DirectionEtude {
             'initiales_de' => 'DE',
         ];
 
-        if (!$idde) {
+        if (empty($idde)) {
             return $profile;
         }
 
@@ -43,25 +43,6 @@ class DirectionEtude {
     }
 
     public function getCentres() {
-        $centres = ['Agla', 'Akpakpa', 'Gbegamey', 'Calavi', 'Porto-novo'];
-
-        foreach ($centres as $centre) {
-            $check = mysqli_prepare($this->conn, 'SELECT idCentre FROM centre WHERE nomCentre = ? LIMIT 1');
-            if (!$check) {
-                continue;
-            }
-            mysqli_stmt_bind_param($check, 's', $centre);
-            mysqli_stmt_execute($check);
-            $result = mysqli_stmt_get_result($check);
-            if (!$result || mysqli_num_rows($result) === 0) {
-                $insert = mysqli_prepare($this->conn, 'INSERT INTO centre (nomCentre) VALUES (?)');
-                if ($insert) {
-                    mysqli_stmt_bind_param($insert, 's', $centre);
-                    mysqli_stmt_execute($insert);
-                }
-            }
-        }
-
         return mysqli_query($this->conn, "
             SELECT idCentre, nomCentre
             FROM centre
@@ -71,25 +52,6 @@ class DirectionEtude {
     }
 
     public function getNiveaux() {
-        $niveaux = ['L1', 'L2', 'L3', 'M1', 'M2'];
-
-        foreach ($niveaux as $niveau) {
-            $check = mysqli_prepare($this->conn, 'SELECT idNiveau FROM niveau WHERE nomNiveau = ? LIMIT 1');
-            if (!$check) {
-                continue;
-            }
-            mysqli_stmt_bind_param($check, 's', $niveau);
-            mysqli_stmt_execute($check);
-            $result = mysqli_stmt_get_result($check);
-            if (!$result || mysqli_num_rows($result) === 0) {
-                $insert = mysqli_prepare($this->conn, 'INSERT INTO niveau (nomNiveau) VALUES (?)');
-                if ($insert) {
-                    mysqli_stmt_bind_param($insert, 's', $niveau);
-                    mysqli_stmt_execute($insert);
-                }
-            }
-        }
-
         return mysqli_query($this->conn, "
             SELECT idNiveau, nomNiveau
             FROM niveau
@@ -102,65 +64,22 @@ class DirectionEtude {
         return $result ? mysqli_fetch_all($result, MYSQLI_ASSOC) : [];
     }
 
-    public function getProfesseurName($idprof) {
-        $idprof = (int) $idprof;
-        if ($idprof <= 0) {
-            return '';
+    public function ensureEtudiantAccountSchema() {
+        $type_column = mysqli_query($this->conn, "SHOW COLUMNS FROM etudiant LIKE 'type_compte'");
+        if (!$type_column || mysqli_num_rows($type_column) === 0) {
+            mysqli_query($this->conn, "ALTER TABLE etudiant ADD type_compte varchar(20) NOT NULL DEFAULT 'consultant' AFTER motdepasse");
         }
-        $stmt = mysqli_prepare($this->conn, 'SELECT nom, prenom FROM professeur WHERE idprof = ? LIMIT 1');
-        if (!$stmt) {
-            return '';
+
+        $centre_column = mysqli_query($this->conn, "SHOW COLUMNS FROM etudiant LIKE 'idCentre'");
+        if (!$centre_column || mysqli_num_rows($centre_column) === 0) {
+            mysqli_query($this->conn, "ALTER TABLE etudiant ADD idCentre int DEFAULT NULL AFTER idfiliere");
         }
-        mysqli_stmt_bind_param($stmt, 'i', $idprof);
-        mysqli_stmt_execute($stmt);
-        $row = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
-        return $row ? trim($row['prenom'] . ' ' . $row['nom']) : '';
-    }
 
-    public function getMemoireDetails($idAM) {
-        $idAM = (int) $idAM;
-        if ($idAM <= 0) {
-            return null;
+        $niveau_column = mysqli_query($this->conn, "SHOW COLUMNS FROM etudiant LIKE 'idNiveau'");
+        if (!$niveau_column || mysqli_num_rows($niveau_column) === 0) {
+            mysqli_query($this->conn, "ALTER TABLE etudiant ADD idNiveau int DEFAULT NULL AFTER idCentre");
         }
-        $stmt = mysqli_prepare($this->conn, "SELECT am.*, f.nom_filiere, CONCAT(am.prenomAut, ' ', am.nomAut) AS auteur 
-                FROM ancien_memoire am 
-                LEFT JOIN filiere f ON f.idfiliere = am.idfiliere 
-                WHERE am.idAM = ?");
-        if (!$stmt) {
-            return null;
-        }
-        mysqli_stmt_bind_param($stmt, 'i', $idAM);
-        mysqli_stmt_execute($stmt);
-        $result = mysqli_stmt_get_result($stmt);
-        return mysqli_fetch_assoc($result);
     }
-
-    public function hasLiked($idAM, $idetudiant) {
-        if (!$idetudiant || $idetudiant <= 0) {
-            return false;
-        }
-        $like_chk = mysqli_query($this->conn, "SELECT idlike FROM like_memoire WHERE idAM = $idAM AND idetudiant = $idetudiant");
-        return mysqli_num_rows($like_chk) > 0;
-    }
-
-    public function getTotalLikes($idAM) {
-        $likes_count_res = mysqli_query($this->conn, "SELECT COUNT(*) AS total FROM like_memoire WHERE idAM = $idAM");
-        return mysqli_fetch_assoc($likes_count_res)['total'] ?? 0;
-    }
-
-    public function getComments($idAM) {
-        return mysqli_query($this->conn, "
-            SELECT c.*, e.nom, e.prenom 
-            FROM commentaire c 
-            JOIN etudiant e ON c.idetudiant = e.idetudiant 
-            WHERE c.idmemoire = $idAM 
-            ORDER BY c.date_commentaire ASC
-        ");
-    }
-}
-
-function generate_student_password() {
-    return 'Etud@' . random_int(100000, 999999);
 }
 
 function smtp_read_response($socket) {
@@ -258,6 +177,10 @@ function send_smtp_email($to, $subject, $body, &$error) {
     smtp_command($socket, 'QUIT', 221, $error);
     fclose($socket);
     return true;
+}
+
+function generate_student_password() {
+    return 'Etud@' . random_int(100000, 999999);
 }
 
 function send_student_credentials_email($email, $prenom, $password, $type_compte, &$error = '') {

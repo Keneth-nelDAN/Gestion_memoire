@@ -17,6 +17,9 @@ switch ($action) {
         // Si la requête est POST, on traite la tentative de connexion
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $authController->processLogin();
+        } else {
+            // Sinon (requête GET), on affiche simplement le formulaire de connexion
+            require_once __DIR__ . '/../app/views/auth/connexion.php';
         }
         break;
     // D'autres cas comme 'logout' pourraient être ajoutés ici.

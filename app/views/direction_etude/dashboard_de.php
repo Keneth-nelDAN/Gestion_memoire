@@ -12,27 +12,10 @@ if (empty($_SESSION['idde']) && (empty($_SESSION['user']) || $_SESSION['user']['
 $dashboardController = new DashboardController();
 
 $active_page = 'dashboard';
-// On garde de_helpers pour get_de_profile car il semble très spécifique à la vue/session
-require_once __DIR__ . '/../../../config/mysqli_config.php';
-$de_profile = get_de_profile($conn);
-$nom_de = $de_profile['nom_de'];
-$initiales_de = $de_profile['initiales_de'];
-
-$dashboard_success = '';
-$dashboard_error = '';
-$generated_prof_password = '';
-$default_prof_password = 'Prof@' . random_int(1000, 9999);
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['dashboard_action'] ?? '') === 'add_professeur') {
-    $result = $dashboardController->addProfesseur($_POST);
-    if ($result['success']) {
-        $dashboard_success = 'Compte professeur créé avec succès depuis le tableau de bord.';
-        $generated_prof_password = $result['password'];
-    } else {
-        $dashboard_error = $result['error'];
-    }
-}
-
+// Le nom et les initiales sont maintenant récupérés depuis la session pour plus de cohérence
+$nom_de = trim(($_SESSION['user']['prenom'] ?? '') . ' ' . ($_SESSION['user']['nom'] ?? ''));
+$initiales_de = strtoupper(substr($_SESSION['user']['prenom'] ?? 'D', 0, 1) . substr($_SESSION['user']['nom'] ?? 'E', 0, 1));
+ 
 $filters = [
     'q' => trim($_GET['q'] ?? ''),
     'filiere' => (int)($_GET['filiere'] ?? 0),
@@ -71,8 +54,8 @@ $annee_filter = $filters['annee'];
                 <p>Bienvenue <?= e($nom_de) ?>, vous gérez les mémoires publiés.</p>
             </div>
             <div class="header-actions">
-                <a class="btn-gold" href="publier_memoire.php"><i class="fa-solid fa-plus"></i> Publier un mémoire</a>
-                <a class="btn-blue" href="publier_lots.php"><i class="fa-solid fa-layer-group"></i> Publier plusieurs mémoires</a>
+                <a class="btn-gold" href="/Gestion_memoire/public/publications"><i class="fa-solid fa-plus"></i> Publier un mémoire</a>
+                <a class="btn-blue" href="/Gestion_memoire/public/publications"><i class="fa-solid fa-layer-group"></i> Publier plusieurs mémoires</a>
             </div>
         </header>
 
@@ -88,18 +71,6 @@ $annee_filter = $filters['annee'];
             <?php elseif ($_GET['status'] === 'not_found'): ?>
                 <div class="alert error text-xs">Le mémoire demandé n'existe pas ou a déjà été supprimé.</div>
             <?php endif; ?>
-        <?php endif; ?>
-        
-        <?php if ($dashboard_success !== ''): ?>
-            <div class="alert success">
-                <?= e($dashboard_success) ?>
-                <?php if ($generated_prof_password !== ''): ?>
-                    Mot de passe provisoire : <strong><?= e($generated_prof_password) ?></strong>
-                <?php endif; ?>
-            </div>
-        <?php endif; ?>
-        <?php if ($dashboard_error !== ''): ?>
-            <div class="alert error"><?= e($dashboard_error) ?></div>
         <?php endif; ?>
 
         <section class="cards-container">
@@ -146,7 +117,7 @@ $annee_filter = $filters['annee'];
                 <span class="result-count"><?= count($memoires) ?> résultat(s)</span>
             </div>
 
-            <form class="search-panel" method="get">
+            <form class="search-panel" action="/Gestion_memoire/public/dashboard" method="get">
                 <input type="search" name="q" value="<?= e($search) ?>" placeholder="Rechercher par titre, auteur, professeur, jury ou filière">
                 <select name="filiere">
                     <option value="0">Toutes les filières</option>
@@ -161,7 +132,7 @@ $annee_filter = $filters['annee'];
                     <?php endforeach; ?>
                 </select>
                 <button class="btn-blue" type="submit"><i class="fa-solid fa-magnifying-glass"></i> Rechercher</button>
-                <a class="btn-muted" href="dashboard_de.php">Réinitialiser</a>
+                <a class="btn-muted" href="/Gestion_memoire/public/dashboard">Réinitialiser</a>
             </form>
 
             <div class="memoires-grid">
@@ -183,14 +154,14 @@ $annee_filter = $filters['annee'];
 
                             <div class="memoire-card-actions">
                                 <a
-                                    href="/Gestion_memoire/app/views/memoire/view_pdf.php?id=<?= $memoire['idAM'] ?>"
+                                    href="/Gestion_memoire/public/pdf/<?= $memoire['idAM'] ?>"
                                     target="_blank"
                                     class="w-full inline-flex items-center justify-center px-4 py-2.5 bg-slate-950 hover:bg-slate-900 group-hover:bg-indigo-600 text-white font-bold text-xs rounded-xl transition-all shadow-sm gap-2"
                                     style="background-color: #2563eb; border-radius: 8px; font-weight: bold; color: white; align-content: center; padding: 0 12px 0 12px;"
                                 >
                                     <i class="fa-solid fa-eye-slash text-xs"></i> Lire en lecture sécurisée
                                 </a>
-                                <a class="btn-blue" href="modifier_publication.php?id=<?= (int) $memoire['idAM'] ?>">
+                                <a class="btn-blue" href="/Gestion_memoire/public/publication/edit/<?= (int) $memoire['idAM'] ?>">
                                     <i class="fa-solid fa-pen-to-square"></i> Modifier
                                 </a>
                                 <button 

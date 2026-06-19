@@ -10,7 +10,7 @@ $filePath = "";
 $themeMemo = "Thèse d'Étude GASA";
 
 if ($memoire_id > 0 && isset($conn)) {
-    $query = "SELECT theme, fichier, chemin_pdf, document, chemin FROM l_ancien_memoire WHERE idAM = ?";
+    $query = "SELECT theme, fichier FROM ancien_memoire WHERE idAM = ?";
     $stmt = mysqli_prepare($conn, $query);
     if ($stmt) {
         mysqli_stmt_bind_param($stmt, "i", $memoire_id);
@@ -18,7 +18,7 @@ if ($memoire_id > 0 && isset($conn)) {
         $result = mysqli_stmt_get_result($stmt);
         if ($row = mysqli_fetch_assoc($result)) {
             $themeMemo = $row['theme'] ?? $themeMemo;
-            $filePath = $row['fichier'] ?? $row['chemin_pdf'] ?? $row['document'] ?? $row['chemin'] ?? '';
+            $filePath = $row['fichier'] ?? '';
         }
         mysqli_stmt_close($stmt);
     }

@@ -1,6 +1,5 @@
 <?php
 session_start();
-require_once __DIR__ . '/de_helpers.php';
 
 // Vérifier que l'utilisateur est un directeur
 if (empty($_SESSION['idde']) && (empty($_SESSION['user']) || $_SESSION['user']['type'] !== 'directeur')) {
@@ -13,11 +12,10 @@ if (empty($_SESSION['idde']) && (empty($_SESSION['user']) || $_SESSION['user']['
 require_once __DIR__ . '/../../controllers/professeurController.php';
 $professeurController = new ProfesseurController();
 
-$active_page = 'professeurs';
-require_once __DIR__ . '/../../../config/mysqli_config.php';
-$de_profile = get_de_profile($conn);
+$de_profile = $professeurController->getDEProfile();
 $nom_de = $de_profile['nom_de'];
 $initiales_de = $de_profile['initiales_de'];
+$active_page = 'professeurs';
 
 $success = $_SESSION['flash']['success'] ?? null;
 $error = $_SESSION['flash']['error'] ?? null;
@@ -49,7 +47,7 @@ $nb_professeurs = count($professeurs);
                 <h1>Ajouter professeur</h1>
                 <p>Créez les comptes enseignants qui pourront se connecter à l'espace professeur.</p>
             </div>
-            <a class="btn-blue" href="dashboard_de.php"><i class="fa-solid fa-arrow-left"></i> Tableau de bord</a>
+            <a class="btn-blue" href="/Gestion_memoire/public/dashboard"><i class="fa-solid fa-arrow-left"></i> Tableau de bord</a>
         </header>
 
         <?php if ($success): ?>
@@ -61,7 +59,7 @@ $nb_professeurs = count($professeurs);
         <?php if ($error): ?><div class="alert error"><?= e($error) ?></div><?php endif; ?>
 
         <section class="professor-layout">
-            <form class="publication-card professor-form" action="/Gestion_memoire/public/professeur/create" method="post" autocomplete="off">
+            <form class="publication-card professor-form" action="/Gestion_memoire/public/professeurs" method="post" autocomplete="off">
                 <div class="form-title">
                     <i class="fa-solid fa-user-check"></i>
                     <div>

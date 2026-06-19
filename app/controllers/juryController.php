@@ -54,6 +54,29 @@ class JuryController {
         return array_slice($merged, 0, 10);
     }
 
+    public function handleValidation($idmemoire, $idprof) {
+        $success = '';
+        $error = '';
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $note = floatval($_POST['note'] ?? 0);
+            $juryMembres = trim($_POST['membres_jury'] ?? '');
+            $comments = trim($_POST['appreciations'] ?? '');
+
+            if ($note < 0 || $note > 20) {
+                $error = "La note saisie doit être comprise entre 0 et 20.";
+            } else {
+                if ($this->validateThesis($idmemoire, $idprof, $note, $juryMembres, $comments)) {
+                    $success = "L'évaluation finale de soutenance a été enregistrée avec succès ! Le mémoire de l'étudiant est validé et archivé.";
+                } else {
+                    $error = "Erreur lors de la notation.";
+                }
+            }
+        }
+
+        return ['success' => $success, 'error' => $error];
+    }
+
     public function validateThesis($idmemoire, $idprof, $note, $juryMembres, $observations) {
         $success = $this->juryModel->updateObservation($idmemoire, $idprof, $observations);
         
@@ -99,5 +122,75 @@ class JuryController {
             $memo = array_merge($memo, $juryInfo);
         }
         return $memo;
+    }
+
+    public function getFilteredMemoiresForJury($idprof, $email, $filters) {
+        $jury_ok = false;
+        $memos = [];
+
+        // 1. Essai de requête active avec JURY et MEMOIRE
+        $sql = "SELECT m.idmemoire AS id, m.theme AS theme, m.theme AS titre, 
+                       CONCAT(e.prenom, ' ', e.nom) AS etudiant, 
+                       CONCAT('GASA-', e.idetudiant) AS matricule,
+                       f.nom_filiere AS filiere, e.niveau AS niveau, 
+                       m.centre AS centre, m.annee_academique AS annee_acad, 
+                       '' AS superviseur, m.statut AS statut, 
+                       j.decision AS note, j.observation AS appreciations,
+                       j.role_jury
+                FROM jury j
+                JOIN memoire m ON j.idmemoire = m.idmemoire
+                JOIN etudiant e ON m.idetudiant = e.idetudiant
+                LEFT JOIN filiere f ON m.idfiliere = f.idfiliere
+                WHERE j.idprof = :idprof";
+        
+        $params = [':idprof' => $idprof];
+
+        if (($filters['niveau'] ?? 'tous') !== 'tous') {
+            $sql .= " AND e.niveau = :niveau";
+            $params[':niveau'] = $filters['niveau'];
+        }
+
+        if (($filters['statut'] ?? 'tous') !== 'tous') {
+            $sql .= " AND m.statut = :statut";
+            $params[':statut'] = $filters['statut'];
+        }
+
+        if (!empty($filters['search'] ?? '')) {
+            $sql .= " AND (m.theme LIKE :search OR e.nom LIKE :search OR e.prenom LIKE :search)";
+            $params[':search'] = '%' . $filters['search'] . '%';
+        }
+
+        $sql .= " ORDER BY m.idmemoire DESC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        $memos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if (count($memos) > 0) {
+            $jury_ok = true;
+        }
+
+        // 2. Fallback si échec ou aucun résultat actif sur la table `ancien_memoire`
+        if (!$jury_ok) {
+            $memos = [];
+            $sql_fallback = "SELECT idAM AS id, theme AS theme, theme AS titre,
+                           CONCAT(prenomAut, ' ', nomAut) AS etudiant,
+                           '' AS matricule,
+                           (SELECT nom_filiere FROM filiere WHERE idfiliere = am.idfiliere LIMIT 1) AS filiere,
+                           '' AS niveau,
+                           (SELECT nomCentre FROM centre WHERE idCentre = am.idCentre LIMIT 1) AS centre,
+                           annee_academique AS annee_acad,
+                           maitre_memoire AS superviseur,
+                           statut,
+                           '' AS note,
+                           '' AS appreciations,
+                           'Président/Examinateur' AS role_jury
+                    FROM `ancien_memoire` am
+                    WHERE (examinateur = :email OR president_jury = :email)";
+            
+            $stmt_fallback = $this->db->prepare($sql_fallback);
+            $stmt_fallback->execute([':email' => $email]);
+            $memos = $stmt_fallback->fetchAll(PDO::FETCH_ASSOC);
+        }
+        return $memos;
     }
 }
